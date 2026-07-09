@@ -17,24 +17,23 @@ Scheduler may overestimate available resources if reservation is too small for t
 
 
 Diagnosis
-Variables (from alert)
+## Variables (from alert)
+
+```bash
 NODE=<labels.node>
+```
 
-
-
-Diagnosis	What to look for	Cause	Action
-oc debug node/$NODE -- cat /host/etc/kubernetes/kubelet.conf | grep -A5 systemReserved	memory reservation too small (for example 1Gi on a busy node)	LOW_RESERVATION	Review reservation size
-oc get --raw /api/v1/nodes/$NODE/proxy/stats/summary	kubelet/runtime memory close to reservation	EXPECTED_SYSTEM_USAGE	Increase reservation if workload is expected
-oc adm top node $NODE	Node memory utilization >90%	NODE_MEMORY_PRESSURE	Investigate overall node memory usage
-oc describe node $NODE	MemoryPressure=True	NODE_MEMORY_PRESSURE	Platform SRE investigation
-oc get pods -A --field-selector spec.nodeName=$NODE --no-headers | wc -l	Very high pod count	HIGH_POD_DENSITY	Increase reservation or reduce pod density
-oc get events --field-selector involvedObject.kind=Node,involvedObject.name=$NODE --sort-by='.lastTimestamp' | tail -20	OOMKilled, Eviction events	NODE_RESOURCE_PRESSURE	Platform SRE investigation
-oc get --raw /api/v1/nodes/$NODE/proxy/stats/summary	kubelet memory unusually high compared to normal baseline	KUBELET_HIGH_USAGE	Investigate kubelet activity (pod churn, image pulls, etc.)
-oc get --raw /api/v1/nodes/$NODE/proxy/stats/summary	runtime (CRI-O) memory unusually high	CRIO_HIGH_USAGE	Investigate container runtime
-—	No obvious issue found	UNKNOWN	Platform SRE investigation
-Useful Commands
-Check configured reservation
-oc debug node/$NODE -- cat /host/etc/kubernetes/kubelet.conf
+| Diagnosis | What to look for | Cause | Action |
+|------------|------------------|--------|--------|
+| `oc debug node/$NODE -- cat /host/etc/kubernetes/kubelet.conf \| grep -A5 systemReserved` | Memory reservation too small (for example, `1Gi` on a busy node) | `LOW_RESERVATION` | Review `systemReserved.memory` and increase the reservation if required. |
+| `oc get --raw /api/v1/nodes/$NODE/proxy/stats/summary` | Kubelet or CRI-O memory usage is close to the reserved memory | `EXPECTED_SYSTEM_USAGE` | Increase the reservation if the workload and system usage are expected. |
+| `oc adm top node $NODE` | Node memory utilization > 90% | `NODE_MEMORY_PRESSURE` | Investigate overall node memory usage and identify memory-intensive workloads. |
+| `oc describe node $NODE` | `MemoryPressure=True` | `NODE_MEMORY_PRESSURE` | Platform SRE investigation. |
+| `oc get pods -A --field-selector spec.nodeName=$NODE --no-headers \| wc -l` | Very high pod count | `HIGH_POD_DENSITY` | Increase `systemReserved.memory` or reduce pod density on the node. |
+| `oc get events --field-selector involvedObject.kind=Node,involvedObject.name=$NODE --sort-by='.lastTimestamp' \| tail -20` | `OOMKilled`, `Eviction`, or other node resource events | `NODE_RESOURCE_PRESSURE` | Platform SRE investigation. |
+| `oc get --raw /api/v1/nodes/$NODE/proxy/stats/summary` | Kubelet memory usage is unusually high compared to the normal baseline | `KUBELET_HIGH_USAGE` | Investigate kubelet activity (pod churn, image pulls, excessive pod count, etc.). |
+| `oc get --raw /api/v1/nodes/$NODE/proxy/stats/summary` | CRI-O (runtime) memory usage is unusually high | `CRIO_HIGH_USAGE` | Investigate container runtime activity and image management. |
+| — | No obvious issue found | `UNKNOWN` | Escalate to Platform SRE for further investigation. |
 
 Look for
 
