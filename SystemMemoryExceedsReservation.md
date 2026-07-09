@@ -103,7 +103,134 @@ CRIO_HIGH_USAGE	Platform SRE
 EXPECTED_SYSTEM_USAGE	Platform SRE
 NODE_RESOURCE_PRESSURE	Platform SRE
 UNKNOWN	Platform SRE
+
 Notes
 This alert is an early warning, not necessarily an outage.
 It monitors system.slice memory usage (system processes), not pod memory usage.
 Increasing systemReserved.memory does not add more RAM to the node; it reserves a larger portion of existing memory for critical node services, reducing the memory available for scheduling application pods. This helps prevent kubelet and other system services from being starved under heavy load.
+
+Set Manually:
+
+apiVersion: machineconfiguration.openshift.io/v1
+kind: KubeletConfig
+metadata:
+  name: set-allocatable
+spec:
+  autoSizingReserved: false
+  machineConfigPoolSelector:
+    matchLabels:
+      pools.operator.machineconfiguration.openshift.io/worker: ""
+  kubeletConfig:
+    systemReserved:
+      cpu: 1000m
+      memory: 4Gi
+      ephemeral-storage: 50Mi
+#...
+
+Automatic allocation:
+
+If you updated your cluster from a version earlier than 4.21, automatic allocation of system resources is disabled by default. To enable the feature, delete the 50-worker-auto-sizing-disabled machine config.
+
+
+
+-------
+
+See what processes consuming RSS (anon)
+
+
+How to identify how much memory left on each node: (RSS)
+
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  curl -s http://localhost:9090/api/v1/query --data-urlencode \
+  'query=(sum(kube_node_status_capacity{resource="memory"} - kube_node_status_allocatable{resource="memory"}) by (node) * 0.95) - sum(container_memory_rss{id="/system.slice"}) by (node)' | jq '.data.result[] | {node: .metric.node, megabytes_left_before_alert: ((.value[1] | tonumber) / 1024 / 1024)}'
+
+How to identify how much memory consumed by processes in RSS.:
+
+ps -eo pid,user,rss,cmd --sort=-rss | grep -E "PID|crio|kubelet|systemd|NetworkManager|python" | head -n 15 | awk '
+NR==1 {print $1, $2, "RSS_MEMORY", $4; next} 
+{
+  rss=$3; 
+  if(rss > 1024*1024) {
+    printf "%-6s %-8s %-10.2f GB %s\n", $1, $2, rss/(1024*1024), $4
+  } else {
+    printf "%-6s %-8s %-10.2f MB %s\n", $1, $2, rss/1024, $4
+  }
+}'
+
+
+------
+runbook - https://github.com/openshift/runbooks/blob/master/alerts/machine-config-operator/SystemMemoryExceedsReservation.md
+
+
+----
+
+mermaid code:
+
+```mermaid
+flowchart TD
+
+A["🚨 SystemMemoryExceedsReservation Alert"]
+
+A --> B["Identify system.slice memory consumers"]
+
+B --> C["Collect memory usage
+- ps -eo pid,user,comm,rss --sort=-rss
+- systemd-cgls /system.slice
+- /sys/fs/cgroup/system.slice/memory.stat
+- container_memory_rss metric"]
+
+C --> D["Analyze top RSS consumers"]
+
+D --> E{"Is any process consuming unexpectedly high memory?"}
+
+E -->|Yes| F["Investigate offending process"]
+
+F --> G{"Is the memory usage expected for the current workload?"}
+
+G -->|No| H["Identify root cause
+• Memory leak
+• Runaway process
+• Bug
+• Misconfiguration
+• Excessive logging"]
+
+H --> I["Fix the issue
+Restart / Upgrade / Reconfigure"]
+
+I --> J["Monitor RSS usage"]
+
+J --> K["Alert Resolved"]
+
+G -->|Yes| L["Host memory demand is legitimate"]
+
+E -->|No| L
+
+L --> M{"Is current systemReserved sufficient?"}
+
+M -->|Yes| N["No configuration changes required
+Continue monitoring"]
+
+M -->|No| O["Increase systemReserved"]
+
+O --> P{"Reservation Method"}
+
+P -->|Static| Q["Create/Modify KubeletConfig
+Configure systemReserved explicitly"]
+
+P -->|Dynamic| R["Enable Dynamic Resource Reservation
+Kubelet calculates reservation automatically"]
+
+Q --> S["Apply configuration"]
+
+R --> S
+
+S --> T["Wait for MachineConfig rollout
+(Reboot if required)"]
+
+T --> U["Validate:
+• Allocatable Memory
+• systemReserved
+• RSS utilization"]
+
+U --> V["Confirm alert no longer fires"]
+```
