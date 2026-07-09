@@ -234,3 +234,130 @@ T --> U["Validate:
 
 U --> V["Confirm alert no longer fires"]
 ```
+
+
+
+-------------------
+
+Step 1: Determine the current systemReserved memory
+
+The alert compares the memory used by system processes against the memory reserved by the kubelet.
+
+First, determine how much memory is reserved on the node.
+
+Check node capacity and allocatable memory
+oc get node <node-name> -o jsonpath='{.status.capacity.memory}{"\n"}{.status.allocatable.memory}{"\n"}'
+
+Calculate:
+
+System Reserved Memory = Capacity - Allocatable
+
+For example:
+
+Capacity	Allocatable	System Reserved
+8 GiB	7 GiB	1 GiB
+Step 2: Identify what is consuming the reserved memory
+
+The alert monitors system.slice, so begin by identifying the host processes consuming memory.
+
+View top RSS consumers
+ps -eo pid,user,comm,rss --sort=-rss
+Identify services running in system.slice
+systemd-cgls /system.slice
+View memory usage of system.slice
+cat /sys/fs/cgroup/system.slice/memory.current
+View memory breakdown
+cat /sys/fs/cgroup/system.slice/memory.stat
+
+Useful fields include:
+
+anon
+file
+slab
+kernel_stack
+pagetables
+Step 3: Identify the high memory consumer and investigate
+
+Determine which process is consuming the majority of the reserved memory.
+
+Process	Typical Reason	Investigation
+kubelet	Large number of Pods, many volumes, frequent Pod lifecycle events	Check Pod density, kubelet logs, kubelet configuration, excessive Pod churn
+CRI-O	Large number of running containers/images	Check running containers, image garbage collection, container lifecycle
+OVN-Kubernetes	Heavy networking load, many Services/Pods	Check OVN logs, networking scale, OVN database health
+metrics-server	Large clusters or heavy metrics collection	Verify expected cluster size and metrics load
+systemd-journald	Excessive logging	Review journal size and log volume
+Node Exporter	Usually low memory	Normally no action required
+NetworkManager	Network issues or configuration changes	Review NetworkManager logs
+Python/Custom Process	Test process, memory leak, custom application	Investigate the application or terminate if unnecessary
+
+Also evaluate Kubernetes workload memory:
+
+oc adm top node
+
+oc adm top pods -A
+
+oc adm top pods -A --containers
+
+High workload density often increases memory usage of kubelet, CRI-O, and networking components.
+
+Step 4: Determine whether the memory usage is expected
+
+Ask the following:
+
+Is the node running significantly more Pods than usual?
+Is the workload memory-intensive?
+Is the increase temporary or sustained?
+Is there evidence of a memory leak or abnormal process behavior?
+If memory usage is not expected
+
+Investigate and resolve the offending process:
+
+Memory leak
+Excessive logging
+Misconfiguration
+Runaway process
+Software bug
+
+Continue monitoring after remediation.
+
+If memory usage is expected
+
+The node legitimately requires more host memory.
+
+Proceed with increasing systemReserved.
+
+Step 5: Resize systemReserved
+
+There are two supported approaches.
+
+Option 1 — Static Reservation (Manual)
+
+Create or modify a KubeletConfig and explicitly define:
+
+systemReserved:
+  cpu: ...
+  memory: ...
+
+Use this when you want a fixed reservation for a machine pool.
+
+Recommended when:
+
+Node sizes are consistent.
+Reservation requirements are well understood.
+You want complete control over the reserved resources.
+Option 2 — Dynamic Resource Reservation
+
+Enable Dynamic Resource Reservation.
+
+The kubelet automatically calculates the reservation based on:
+
+Total node memory
+Total node CPU
+
+Larger nodes receive proportionally larger reservations.
+
+Recommended when:
+
+Nodes have different sizes.
+Large clusters are expected to grow.
+You want reservations to scale automatically with hardware capacity.
