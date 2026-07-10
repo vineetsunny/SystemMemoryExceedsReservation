@@ -157,37 +157,33 @@ runbook - https://github.com/openshift/runbooks/blob/master/alerts/machine-confi
 
 ----
 
-%%{init: {"flowchart":{"nodeSpacing":15,"rankSpacing":25}}}%%
-
 flowchart TD
 
-A["🚨 Memory Alert"]
-
-A --> B["Find system.slice users"]
-B --> C["Collect RSS"]
+A["🚨 SystemMemoryExceedsReservation Alert"]
+A --> B["Find system.slice consumers"]
+B --> C["Collect RSS usage"]
 C --> D["Analyze top consumers"]
 
-D --> E{"Expected?"}
+D --> E{"Expected memory usage?"}
 
-E -- No --> F["Investigate process"]
-F --> G["Find root cause"]
+E -->|No| F["Investigate process"]
+F --> G["Identify root cause"]
 G --> H["Fix issue"]
 H --> I["Monitor RSS"]
-I --> J["Resolved"]
+I --> J["✅ Alert resolved"]
 
-E -- Yes --> K["Increase systemReserved"]
+E -->|Yes| K["Increase systemReserved"]
+K --> L{"Reservation method"}
 
-K --> L{"Reservation"}
+L -->|Static| M["Configure KubeletConfig"]
+L -->|Dynamic| N["Enable Dynamic Reservation"]
 
-L -- Static --> M["KubeletConfig"]
-L -- Dynamic --> N["Dynamic Reservation"]
-
-M --> O["Apply config"]
+M --> O["Apply configuration"]
 N --> O
 
 O --> P["MachineConfig rollout"]
-P --> Q["Validate"]
-Q --> R["Alert cleared"]
+P --> Q["Validate configuration"]
+Q --> R["✅ Alert cleared"]
 
 
 
