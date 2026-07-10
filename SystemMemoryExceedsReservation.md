@@ -285,56 +285,34 @@ Step 5: Resize systemReserved
 
 --------------
 
-There are two supported approaches.
 
-Option 1 — Static Reservation (Manual)
+```mermaid
+flowchart TD
 
-Create or modify a KubeletConfig and explicitly define:
+A["SystemMemoryExceedsReservation Alert"]
+A --> B["Find system.slice consumers"]
+B --> C["Collect RSS usage"]
+C --> D["Analyze top consumers"]
 
-systemReserved:
-  cpu: ...
-  memory: ...
+D --> E{"Expected memory usage?"}
 
-Use this when you want a fixed reservation for a machine pool.
+E -->|No| F["Investigate process"]
+F --> G["Identify root cause"]
+G --> H["Fix issue"]
+H --> I["Monitor RSS"]
+I --> J["Alert resolved"]
 
-Recommended when:
+E -->|Yes| K["Increase systemReserved"]
+K --> L{"Reservation method"}
 
-Node sizes are consistent.
-Reservation requirements are well understood.
-You want complete control over the reserved resources.
-Option 2 — Dynamic Resource Reservation
+L -->|Static| M["Configure KubeletConfig"]
+L -->|Dynamic| N["Enable Dynamic Reservation"]
 
-Enable Dynamic Resource Reservation.
+M --> O["Apply configuration"]
+N --> O
 
-The kubelet automatically calculates the reservation based on:
+O --> P["MachineConfig rollout"]
+P --> Q["Validate configuration"]
+Q --> R["Alert cleared"]
+```
 
-Total node memory
-Total node CPU
-
-Larger nodes receive proportionally larger reservations.
-
-Recommended when:
-
-Nodes have different sizes.
-Large clusters are expected to grow.
-You want reservations to scale automatically with hardware capacity.
-
-
-
-
-
-
--------------
-
-https://github.com/AliAkkaya7/alert-eda/blob/main/alert-runbooks/NodeMemoryMajorPagesFaults.md
-oc debug node/$NODE -- chroot /host bash -c 'grep "^SYSTEM_RESERVED_MEMORY=" /etc/node-sizing.env'
-RUNBOOK - https://github.com/openshift/runbooks/blob/master/alerts/machine-config-operator/SystemMemoryExceedsReservation.md
-
-Confirm the availablity of Machine config:
- oc get mc | grep 50                        
-50-master-auto-sizing-disabled                                                                
-50-worker-auto-sizing-disabled
-
-Then delete MC for master and worker.
-oc delete mc 50-master-auto-sizing-disabled  
-oc delete mc 50-worker-auto-sizing-disabled
