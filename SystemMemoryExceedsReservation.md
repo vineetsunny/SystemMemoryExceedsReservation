@@ -157,58 +157,37 @@ runbook - https://github.com/openshift/runbooks/blob/master/alerts/machine-confi
 
 ----
 
-```mermaid
+%%{init: {"flowchart":{"nodeSpacing":15,"rankSpacing":25}}}%%
+
 flowchart TD
 
-A["🚨 SystemMemoryExceedsReservation Alert"]
+A["🚨 Memory Alert"]
 
-A --> B["Identify system.slice memory consumers"]
+A --> B["Find system.slice users"]
+B --> C["Collect RSS"]
+C --> D["Analyze top consumers"]
 
-B --> C["Collect memory usage"]
+D --> E{"Expected?"}
 
-C --> D["Analyze top RSS consumers"]
+E -- No --> F["Investigate process"]
+F --> G["Find root cause"]
+G --> H["Fix issue"]
+H --> I["Monitor RSS"]
+I --> J["Resolved"]
 
-D --> E{"Is the memory usage expected for the current workload?"}
+E -- Yes --> K["Increase systemReserved"]
 
-E -->|No| F["Investigate offending process"]
+K --> L{"Reservation"}
 
-F --> G["Identify root cause
-• Memory leak
-• Runaway process
-• Bug
-• Misconfiguration
-• Excessive logging"]
+L -- Static --> M["KubeletConfig"]
+L -- Dynamic --> N["Dynamic Reservation"]
 
-G --> H["Fix issue
-Restart / Upgrade / Reconfigure"]
-
-H --> I["Monitor RSS usage"]
-
-I --> J["Alert Resolved"]
-
-E -->|Yes| K["Increase systemReserved"]
-
-K --> L{"Choose Reservation Method"}
-
-L -->|Static| M["Configure KubeletConfig
-(systemReserved)"]
-
-L -->|Dynamic| N["Enable Dynamic Resource Reservation"]
-
-M --> O["Apply configuration"]
-
+M --> O["Apply config"]
 N --> O
 
-O --> P["Wait for MachineConfig rollout
-(Reboot if required)"]
-
-P --> Q["Validate
-• Allocatable Memory
-• systemReserved
-• RSS utilization"]
-
-Q --> R["Confirm alert no longer fires"]
-```
+O --> P["MachineConfig rollout"]
+P --> Q["Validate"]
+Q --> R["Alert cleared"]
 
 
 
