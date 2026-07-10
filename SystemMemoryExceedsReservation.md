@@ -287,7 +287,6 @@ Step 5: Resize systemReserved
 
 
 ```mermaid
-flowchart TD
 
 flowchart TD
 
@@ -329,4 +328,3 @@ P --> Q["Validate"]
 
 Q --> R["Alert cleared"]
 ```
-
