@@ -289,30 +289,44 @@ Step 5: Resize systemReserved
 ```mermaid
 flowchart TD
 
-A["SystemMemoryExceedsReservation Alert"]
-A --> B["Find system.slice consumers"]
-B --> C["Collect RSS usage"]
-C --> D["Analyze top consumers"]
+flowchart TD
 
-D --> E{"Expected memory usage?"}
+A["Memory Alert"]
 
-E -->|No| F["Investigate process"]
-F --> G["Identify root cause"]
-G --> H["Fix issue"]
-H --> I["Monitor RSS"]
-I --> J["Alert resolved"]
+A --> B["Find consumers"]
 
-E -->|Yes| K["Increase systemReserved"]
-K --> L{"Reservation method"}
+B --> C["Collect RSS"]
 
-L -->|Static| M["Configure KubeletConfig"]
-L -->|Dynamic| N["Enable Dynamic Reservation"]
+C --> D["Analyze RSS"]
 
-M --> O["Apply configuration"]
+D --> E{"Expected?"}
+
+E -->|No| F["Investigate"]
+
+F --> G["Root cause"]
+
+G --> H["Fix"]
+
+H --> I["Monitor"]
+
+I --> J["Resolved"]
+
+E -->|Yes| K["Increase reservation"]
+
+K --> L{"Method"}
+
+L -->|Static| M["KubeletConfig"]
+
+L -->|Dynamic| N["Dynamic Reservation"]
+
+M --> O["Apply"]
+
 N --> O
 
-O --> P["MachineConfig rollout"]
-P --> Q["Validate configuration"]
+O --> P["Rollout"]
+
+P --> Q["Validate"]
+
 Q --> R["Alert cleared"]
 ```
 
