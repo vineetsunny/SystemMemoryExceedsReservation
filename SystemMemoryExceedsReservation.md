@@ -26,14 +26,7 @@ NODE=<labels.node>
 | Diagnosis | What to look for | Cause | Action |
 |------------|------------------|--------|--------|
 | `oc debug node/$NODE -- cat /host/etc/kubernetes/kubelet.conf \| grep -A5 systemReserved` | Memory reservation too small (for example, `1Gi` on a busy node) | `LOW_RESERVATION` | Review `systemReserved.memory` and increase the reservation if required. |
-| `oc get --raw /api/v1/nodes/$NODE/proxy/stats/summary` | Kubelet or CRI-O memory usage is close to the reserved memory | `EXPECTED_SYSTEM_USAGE` | Increase the reservation if the workload and system usage are expected. |
-| `oc adm top node $NODE` | Node memory utilization > 90% | `NODE_MEMORY_PRESSURE` | Investigate overall node memory usage and identify memory-intensive workloads. |
-| `oc describe node $NODE` | `MemoryPressure=True` | `NODE_MEMORY_PRESSURE` | Platform SRE investigation. |
-| `oc get pods -A --field-selector spec.nodeName=$NODE --no-headers \| wc -l` | Very high pod count | `HIGH_POD_DENSITY` | Increase `systemReserved.memory` or reduce pod density on the node. |
-| `oc get events --field-selector involvedObject.kind=Node,involvedObject.name=$NODE --sort-by='.lastTimestamp' \| tail -20` | `OOMKilled`, `Eviction`, or other node resource events | `NODE_RESOURCE_PRESSURE` | Platform SRE investigation. |
-| `oc get --raw /api/v1/nodes/$NODE/proxy/stats/summary` | Kubelet memory usage is unusually high compared to the normal baseline | `KUBELET_HIGH_USAGE` | Investigate kubelet activity (pod churn, image pulls, excessive pod count, etc.). |
-| `oc get --raw /api/v1/nodes/$NODE/proxy/stats/summary` | CRI-O (runtime) memory usage is unusually high | `CRIO_HIGH_USAGE` | Investigate container runtime activity and image management. |
-| — | No obvious issue found | `UNKNOWN` | Escalate to Platform SRE for further investigation. |
+
 
 Look for
 
@@ -164,8 +157,6 @@ runbook - https://github.com/openshift/runbooks/blob/master/alerts/machine-confi
 
 ----
 
-mermaid code:
-
 ```mermaid
 flowchart TD
 
@@ -173,66 +164,50 @@ A["🚨 SystemMemoryExceedsReservation Alert"]
 
 A --> B["Identify system.slice memory consumers"]
 
-B --> C["Collect memory usage
-- ps -eo pid,user,comm,rss --sort=-rss
-- systemd-cgls /system.slice
-- /sys/fs/cgroup/system.slice/memory.stat
-- container_memory_rss metric"]
+B --> C["Collect memory usage"]
 
 C --> D["Analyze top RSS consumers"]
 
-D --> E{"Is any process consuming unexpectedly high memory?"}
+D --> E{"Is the memory usage expected for the current workload?"}
 
-E -->|Yes| F["Investigate offending process"]
+E -->|No| F["Investigate offending process"]
 
-F --> G{"Is the memory usage expected for the current workload?"}
-
-G -->|No| H["Identify root cause
+F --> G["Identify root cause
 • Memory leak
 • Runaway process
 • Bug
 • Misconfiguration
 • Excessive logging"]
 
-H --> I["Fix the issue
+G --> H["Fix issue
 Restart / Upgrade / Reconfigure"]
 
-I --> J["Monitor RSS usage"]
+H --> I["Monitor RSS usage"]
 
-J --> K["Alert Resolved"]
+I --> J["Alert Resolved"]
 
-G -->|Yes| L["Host memory demand is legitimate"]
+E -->|Yes| K["Increase systemReserved"]
 
-E -->|No| L
+K --> L{"Choose Reservation Method"}
 
-L --> M{"Is current systemReserved sufficient?"}
+L -->|Static| M["Configure KubeletConfig
+(systemReserved)"]
 
-M -->|Yes| N["No configuration changes required
-Continue monitoring"]
+L -->|Dynamic| N["Enable Dynamic Resource Reservation"]
 
-M -->|No| O["Increase systemReserved"]
+M --> O["Apply configuration"]
 
-O --> P{"Reservation Method"}
+N --> O
 
-P -->|Static| Q["Create/Modify KubeletConfig
-Configure systemReserved explicitly"]
-
-P -->|Dynamic| R["Enable Dynamic Resource Reservation
-Kubelet calculates reservation automatically"]
-
-Q --> S["Apply configuration"]
-
-R --> S
-
-S --> T["Wait for MachineConfig rollout
+O --> P["Wait for MachineConfig rollout
 (Reboot if required)"]
 
-T --> U["Validate:
+P --> Q["Validate
 • Allocatable Memory
 • systemReserved
 • RSS utilization"]
 
-U --> V["Confirm alert no longer fires"]
+Q --> R["Confirm alert no longer fires"]
 ```
 
 
