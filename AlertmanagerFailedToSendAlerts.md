@@ -79,3 +79,40 @@ Review alert routing and grouping configuration, reduce alert volume, and verify
 502 Bad Gateway or 503 Service Unavailable
 Receiver service or upstream infrastructure is temporarily unavailable.
 Verify the receiver service health, retry after recovery, and monitor the external service status.
+
+
+
+
+
+A["🚨 AlertmanagerFailedToSendAlerts"]
+
+A --> B["Collect Alertmanager Logs"]
+
+B --> C["Identify Receiver & Error Message"]
+
+C --> D{"Failure Domain"}
+
+D -->|DNS| E["Run DNS Checks"]
+
+D -->|Network| F["Test Connectivity & NetworkPolicy"]
+
+D -->|TLS / Auth| G["Validate Certificates & Secrets"]
+
+D -->|Configuration| H["Verify Alertmanager Config"]
+
+D -->|Receiver| I["Check Receiver Availability"]
+
+E --> J{"Root Cause Identified?"}
+F --> J
+G --> J
+H --> J
+I --> J
+
+J -->|Yes| K["Recommend Remediation"]
+
+J -->|No| L["Collect Diagnostics"]
+
+L --> M["Classify as Unknown Failure"]
+
+M --> N["Escalate for Manual Investigation"]
+
