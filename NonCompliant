@@ -202,6 +202,43 @@ High	MachineConfig, kubelet configuration, kernel settings, node reboot	Manual a
 Critical	Control plane configuration changes	Follow formal change management (CAB) and perform manual implementation.
 Key Points
 Every failed compliance rule is reported as a ComplianceCheckResult.
+
+
+
+Decision:
+
+flowchart TD
+
+A([NonCompliant Alert Fired])
+
+A --> B[Check Compliance Suite Status]
+
+B --> C[Verify Compliance Scan Completed]
+
+C --> D{Scan Status = DONE?}
+
+D -- No --> E[Wait for Scan Completion]
+E --> C
+
+D -- Yes --> F[Review Failed Compliance Checks]
+
+F --> G{Remediation Available?}
+
+G -- Yes --> H[Review & Apply Approved Remediation]
+
+G -- No --> I[Perform Manual Configuration Fix]
+
+H --> J[Rerun Compliance Scan]
+I --> J
+
+J --> K[Verify Compliance Suite Status]
+
+K --> L{COMPLIANT?}
+
+L -- Yes --> M([Close Alert])
+
+L -- No --> F
+
 Not every failed rule has a corresponding ComplianceRemediation.
 Automated remediation should only be applied after understanding its operational impact.
 Compliance should always be verified by rerunning the scan and confirming that the Compliance Suite returns to the COMPLIANT state.
