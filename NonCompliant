@@ -1,0 +1,207 @@
+Alert Description
+
+This alert indicates that one or more Compliance Suites managed by the OpenShift Compliance Operator have entered a NON-COMPLIANT, ERROR, or INCONSISTENT state.
+
+NON-COMPLIANT – One or more compliance rules defined by the selected security profile (for example, CIS or NIST) have failed.
+ERROR – The compliance scan encountered an error and could not complete successfully.
+INCONSISTENT – The scan produced incomplete or unreliable results that require further investigation.
+
+When this alert is triggered, the cluster configuration no longer satisfies all the requirements defined by the applied compliance profile. The failed compliance checks must be reviewed to identify the affected security controls and determine whether remediation is required.
+
+Impact
+The cluster is no longer fully compliant with the selected compliance benchmark.
+Security, regulatory, or organizational compliance requirements may not be satisfied.
+Failed compliance checks can indicate:
+Security configuration weaknesses
+Missing security controls
+Policy violations
+Incorrect cluster or node configuration
+Manual investigation and remediation may be required before the cluster can be considered compliant again.
+Trigger Condition
+
+The alert is triggered when the following Prometheus expression evaluates to true:
+
+compliance_operator_compliance_state{name=~".+", namespace="openshift-compliance"} > 0
+
+This indicates that at least one Compliance Suite is in one of the following states:
+
+NON-COMPLIANT
+ERROR
+INCONSISTENT
+Investigation Procedure
+Step 1 – Verify Compliance Operator Installation
+
+Ensure the Compliance Operator is installed and running.
+
+oc get csv -n openshift-compliance
+
+Verify that the installed operator version is the expected release (for example, v1.9.1).
+
+Step 2 – Verify the Active ScanSettingBinding
+
+Identify which compliance profiles and scan settings are currently applied.
+
+oc get scansettingbinding -A
+
+Example:
+
+apiVersion: compliance.openshift.io/v1alpha1
+kind: ScanSettingBinding
+metadata:
+  name: ocp4-cis
+  namespace: openshift-compliance
+profiles:
+- name: ocp4-cis
+- name: ocp4-cis-node
+settingsRef:
+  name: default
+
+This determines:
+
+Compliance profiles being evaluated
+Scan settings used during execution
+Step 3 – Verify Compliance Suite Status
+
+Check the overall compliance status.
+
+oc get compliancesuites -A
+
+Expected states include:
+
+COMPLIANT
+NON-COMPLIANT
+ERROR
+INCONSISTENT
+
+Record the affected Compliance Suite.
+
+Step 4 – Verify Compliance Scan Completion
+
+List all compliance scans.
+
+oc get compliancescans -n openshift-compliance
+
+Ensure every scan has reached the DONE phase.
+
+Important
+
+Compliance scans progress through the following phases:
+
+PENDING
+→ LAUNCHING
+→ RUNNING
+→ AGGREGATING
+→ DONE
+
+Do not review or apply remediations until the scan has completed successfully and reached the DONE phase.
+
+Step 5 – Identify Failed Compliance Checks
+
+Retrieve all failed compliance checks.
+
+oc get compliancecheckresults -n openshift-compliance | grep -i FAIL
+
+This identifies which compliance rules failed during the scan.
+
+Step 6 – Review the Failed Compliance Check
+
+Inspect the failed check in detail.
+
+oc describe compliancecheckresult <check-name> -n openshift-compliance
+
+Review:
+
+Description
+Severity
+Rationale
+Warning
+Current Result
+
+These fields explain why the rule failed and its security significance.
+
+Step 7 – Determine Whether a Remediation Exists
+
+Check whether the failed rule has an associated remediation.
+
+oc get complianceremediations -n openshift-compliance
+
+or
+
+oc get complianceremediations <remediation-name> -n openshift-compliance
+
+Possible outcomes:
+
+A ComplianceRemediation object exists.
+No remediation exists, indicating manual intervention is required.
+Step 8 – Review the Proposed Remediation
+
+Before applying any remediation, review the following fields:
+
+Description
+Instructions
+Rationale
+
+Determine:
+
+What configuration change will be made
+Whether the change is appropriate for your environment
+Whether the change could impact running workloads
+Step 9 – Apply an Approved Remediation
+
+If the remediation has been reviewed and approved:
+
+oc patch complianceremediation <remediation-name> \
+-n openshift-compliance \
+--type=merge \
+-p '{"spec":{"apply":true}}'
+
+Note
+
+Some remediations create MachineConfig resources or require a node reboot. Always evaluate operational impact before applying changes in production.
+
+Step 10 – Rerun the Compliance Scan
+
+After remediation has been applied, rerun the compliance scan.
+
+oc get compliancescans -n openshift-compliance
+
+Wait until the scan reaches the DONE phase.
+
+Step 11 – Verify Compliance
+
+Confirm that the failed checks have been resolved.
+
+oc get compliancecheckresults -n openshift-compliance | grep -i FAIL
+
+Also verify:
+
+oc get compliancesuites -A
+
+The Compliance Suite should return to the COMPLIANT state.
+
+Decision Matrix
+Scenario	Recommended Action
+Automated remediation available	Review, test in a non-production environment, and apply after approval.
+No remediation available	Perform manual investigation, implement the required configuration change, and rerun the compliance scan.
+ERROR state	Investigate scan execution failures before reviewing compliance results.
+INCONSISTENT state	Investigate scan completion and data aggregation issues before trusting the results.
+Production Best Practices
+
+Use the Compliance Operator as a compliance assessment and remediation assistant rather than enabling unrestricted automatic remediation.
+
+Review every failed compliance check before taking action.
+Validate remediation changes in a development or test environment before production deployment.
+Follow the organization's change management process for configuration changes.
+Rerun compliance scans after remediation to confirm that the issue has been resolved.
+Enable automatic remediation only for low-risk, non-disruptive configuration changes after appropriate testing.
+Remediation Risk Classification
+Risk Level	Example	Recommended Action
+Low	Labels, ConfigMaps, non-disruptive configuration	Automatic remediation may be appropriate after validation.
+Medium	OAuth configuration, RBAC changes	Review and approve before applying.
+High	MachineConfig, kubelet configuration, kernel settings, node reboot	Manual approval and planned maintenance window required.
+Critical	Control plane configuration changes	Follow formal change management (CAB) and perform manual implementation.
+Key Points
+Every failed compliance rule is reported as a ComplianceCheckResult.
+Not every failed rule has a corresponding ComplianceRemediation.
+Automated remediation should only be applied after understanding its operational impact.
+Compliance should always be verified by rerunning the scan and confirming that the Compliance Suite returns to the COMPLIANT state.
