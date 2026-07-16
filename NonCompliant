@@ -244,7 +244,7 @@ Not every failed rule has a corresponding ComplianceRemediation.
 
 
 
-
+oc edit scansetting default -n openshift-compliance
 roles:
 - master
 - worker
@@ -255,5 +255,24 @@ showNotApplicable: false
 strictNodeScan: true
 suspend: false
 timeout: 30m
+
+
+
+
+oc get complianceremediation -n openshift-compliance                              
+NAME                                               STATE
+ocp4-cis-api-server-encryption-provider-cipher-1   NotApplied
+ocp4-cis-audit-profile-set                         NotApplied
+ocp4-cis-ingress-controller-tls-cipher-suites      NotApplied
+vineet.thakur.ext@Intives-MacBook-Pro alert_slack %  oc get compliancecheckresults -n openshift-compliance | grep -i fail                                     
+ocp4-cis-api-server-encryption-provider-cipher                                FAIL     medium
+ocp4-cis-audit-log-forwarding-enabled                                         FAIL     medium
+ocp4-cis-audit-profile-set                                                    FAIL     medium
+ocp4-cis-configure-network-policies-namespaces                                FAIL     high
+ocp4-cis-ingress-controller-tls-cipher-suites                                 FAIL     medium
+ocp4-cis-ocp-allowed-registries                                               FAIL     medium
+ocp4-cis-ocp-allowed-registries-for-import                                    FAIL     medium
+
+
 Automated remediation should only be applied after understanding its operational impact.
 Compliance should always be verified by rerunning the scan and confirming that the Compliance Suite returns to the COMPLIANT state.
