@@ -1,0 +1,38 @@
+1. After installing the compliance operator : 1.9.1
+
+2. What scan settings are being used? 
+
+2. Apply the scansettting binding: 
+oc get scansettingbinding -A
+
+apiVersion: compliance.openshift.io/v1alpha1
+kind: ScanSettingBinding
+metadata:
+  name: ocp4-cis
+  namespace: openshift-compliance
+profiles:
+  - apiGroup: compliance.openshift.io/v1alpha1
+    kind: Profile
+    name: ocp4-cis
+  - apiGroup: compliance.openshift.io/v1alpha1
+    kind: Profile
+    name: ocp4-cis-node
+settingsRef:
+  apiGroup: compliance.openshift.io/v1alpha1
+  kind: ScanSetting
+  name: default
+
+3. Check the compliancesuite  status : is it compliance or non compliance
+oc get compliancesuites -A
+
+4. Make sure compliance scan in the done state: 
+oc get compliancescans -n openshift-compliance
+
+NOTE: The compliance scan moves sequentially through the LAUNCHING, RUNNING, AGGREGATING, and DONE phases. You must verify that the scan has fully reached the DONE phase before attempting to apply any generated ComplianceRemediation fixes.
+
+4. oc get compliancecheckresults -n openshift-compliance | grep -i FAIL 
+
+5. oc get complianceremediations <failcheck>
+
+5. Approve the remediation:
+oc patch complianceremediations/<name of remediation> -n openshift-compliance --type=merge -p '{"spec":{"apply":true}}'
