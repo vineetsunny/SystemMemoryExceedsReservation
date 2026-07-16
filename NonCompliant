@@ -240,5 +240,20 @@ L -- Yes --> M([Close Alert])
 L -- No --> F
 
 Not every failed rule has a corresponding ComplianceRemediation.
+
+
+
+
+
+roles:
+- master
+- worker
+scanTolerations:
+- operator: Exists
+schedule: "*/10 * * * *"
+showNotApplicable: false
+strictNodeScan: true
+suspend: false
+timeout: 30m
 Automated remediation should only be applied after understanding its operational impact.
 Compliance should always be verified by rerunning the scan and confirming that the Compliance Suite returns to the COMPLIANT state.
