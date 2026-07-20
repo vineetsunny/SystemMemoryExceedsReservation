@@ -26,7 +26,19 @@ Business Impact
 
 Planned migration windows may be delayed.
 
+Diagnosis:
 
+
+| Migration Phase | Responsible Component| Common Issues | Primary Logs | Investigation Commands| Next Checks|
+|-----------------|----------------------|---------------|---------------|------------------------|------------|
+|Initialize	| Forklift Controller | Provider authentication failure, inventory collection failure, provider API unreachable, invalid migration plan, missing network/storage mapping | forklift-controller | oc describe migration <migration> -n openshift-mtv, 
+oc logs deployment/forklift-controller -n openshift-mtv	| Verify Provider, Plan, NetworkMap, StorageMap | 
+| DiskAllocation | Forklift Controller + Kubernetes Storage	| PVC Pending, StorageClass missing, insufficient storage, CSI provisioning failure, quota exceeded	| forklift-controller| oc get pvc -n <targe-ns>, oc describe pvc <pvc> -n <target-ns>,
+oc logs deployment/forklift-controller -n openshift-mtv	| Verify PV/PVC, StorageClass, CSI driver
+| ImageConversion| virt-v2v Pod | Guest OS conversion failure, unsupported OS, missing drivers, conversion script errors | virt-v2v pod	| oc get pods -n <target-ns> /| grep virt-v2v , oc logs <virt-v2v-pod> -n <target-ns> | Review conversion errors, guest OS compatibility|
+| DiskTransferV2v | virt-v2v Pod | VMware disk read failure, upload failure, network timeout, authentication failure, storage write error | virt-v2v pod | oc logs <virt-v2v-pod> -n <target-ns>, oc describe pod <virt-v2v-pod> -n <target-ns> | Verify provider connectivity, storage, network throughput|
+|VirtualMachineCreation	| MTV Controller + KubeVirt + CDI | VM validation failed, DataVolume not ready, PVC not bound, scheduling failure, insufficient resources | VM Events, DataVolume, KubeVirt | oc get vm,vmi -n <target-ns> | oc describe vm <vm>, oc get dv -n <target-ns>, oc describe dv <dv> | Verify DataVolumes, PVCs, node resources
+Completed	—	No issue	—	oc get migration -n openshift-mtv	Verify VM boots successfully
 
 
 
