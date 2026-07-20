@@ -72,7 +72,34 @@ N --> O
 
 
 
+Tests:
 
+est Case ID	Test Scenario	Test Steps
+TC-MTV-001	Restart cluster node during active migration	Step 1: Create a migration plan for the source VM.
+Step 2: Start the migration execution.
+Step 3: Monitor the migration until it reaches the ImageConversion or DiskTransferV2v phase.
+Step 4: Identify the worker node hosting the virt-v2v migration pod.
+Step 5: Restart the worker node while the migration is in progress.
+Step 6: Wait for the migration to complete or fail.
+Step 7: Verify that the migration status changes to Failed.
+Step 8: Verify that the MigrationFailed alert is generated in Alertmanager.
+Step 9: Collect migration events and logs for validation.
+TC-MTV-002	Delete migration plan without archiving and recreate migration for the same VM	Step 1: Create a migration plan for the source VM.
+Step 2: Execute the migration (or keep the migration metadata intact).
+Step 3: Delete the migration plan without archiving it.
+Step 4: Create a new migration plan using the same source VM.
+Step 5: Validate and start the new migration.
+Step 6: Observe the migration validation failure.
+Step 7: Verify the error message similar to MacConflicts / NotValid for the VM.
+Step 8: Verify that the migration execution is marked Failed (if applicable).
+Step 9: Verify that the MigrationFailed alert is generated and collect the relevant logs.
+Verification Commands (Applicable to Both Test Cases)
+oc get migration -n openshift-mtv
+oc describe migration <migration-name> -n openshift-mtv
+oc get events -n openshift-mtv --sort-by=.lastTimestamp
+oc logs deployment/forklift-controller -n openshift-mtv
+oc get pods -A | grep virt-v2v
+oc logs <virt-v2v-pod> -n <target-namespace>
 
 
 
