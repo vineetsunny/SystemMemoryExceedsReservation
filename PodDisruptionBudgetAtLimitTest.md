@@ -40,7 +40,9 @@ nginx-demo-pdb   2               N/A               0                     16s
 
 
 **3. Wait for Prometheus to evaluate the alert rule, and generate the alert.**
-![Uploading image.png…]()
+<img width="1958" height="216" alt="image" src="https://github.com/user-attachments/assets/da7eef12-5286-4a23-97c0-a8d109cb79e3" />
+
+![PDB Decision Flow](https://github.com/user-attachments/assets/da7eef12-5286-4a23-97c0-a8d109cb79e3)
 
 **4. Resolve the alert by increasing the Deployment replicas from 2 to 3.**
 ```bash
