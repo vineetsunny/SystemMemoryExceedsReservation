@@ -31,8 +31,7 @@ This alert indicates that the application has reached the minimum number of heal
 |----------|-----------------|-------------|------------|
 | Single replica deployment	| Deployment has replicas=1 and the PDB has minAvailable=1 or maxUnavailable=0. AllowedDisruptions=0.| Increase the number of replicas so Kubernetes can safely evict one pod during maintenance oc scale deployment <deployment-name> --replicas=2 -n <namespace>	 | Requires application owner approval| 
 | Pods are not Ready | Pods are in CrashLoopBackOff, Pending, ImagePullBackOff, or NotReady. | Restore pod health by investigating logs, events, scheduling issues, image pulls, or resource constraints. Once the pods become Ready, the PDB status will recover automatically.| Investigate pod issue|
-| PDB configuration is too restrictive | minAvailable equals the number of replicas, or maxUnavailable=0, preventing voluntary disruptions.
-Review the PDB with the application owner. If the application can tolerate fewer healthy replicas, decrease minAvailable or increase maxUnavailable.<br>oc patch pdb <pdb-name> -p '{"spec":{"minAvailable":<count>}}' | Manual approval required |
+| PDB configuration is too restrictive | minAvailable equals the number of replicas, or maxUnavailable=0, preventing voluntary disruptions| Review the PDB with the application owner. If the application can tolerate fewer healthy replicas, decrease minAvailable or increase maxUnavailable.<br>oc patch pdb <pdb-name> -p '{"spec":{"minAvailable":<count>}}' |Manual approval required|
 | Alert occurs during cluster upgrade or node maintenance | Alert appears while upgrading the cluster or draining nodes.| If multiple nodes are being updated simultaneously, reduce the MachineConfigPool maxUnavailable to decrease the number of nodes being drained at the same time.<br>oc patch mcp <mcp-name> --type merge --patch '{"spec":{"maxUnavailable":<count>}}' | Cluster administrator approval required | 
 
 
