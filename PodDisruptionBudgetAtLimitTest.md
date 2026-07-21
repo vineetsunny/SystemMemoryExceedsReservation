@@ -1,5 +1,5 @@
 1. Deploy an NGINX application with 2 replicas.
-
+```bash
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -9,13 +9,14 @@ spec:
   selector:
     matchLabels:
       app: nginx-demo
-
+```
 Result:
+```bash
 oc get pods -n default
 NAME                         READY   STATUS    RESTARTS   AGE
 nginx-demo-87cd4cbb7-hcqh6   1/1     Running   0          5m40s
 nginx-demo-87cd4cbb7-xf8xs   1/1     Running   0          5m40s
-
+```
 
 
 2. Create the following PodDisruptionBudget (PDB):
