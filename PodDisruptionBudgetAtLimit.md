@@ -2,11 +2,13 @@
 
 PrometheusRule
 [OpenShift Runbook](https://github.com/openshift/runbooks/blob/master/alerts/cluster-kube-controller-manager-operator/PodDisruptionBudgetAtLimit.md)
-for: 60m
+for: 1h
 
 ## Meaning
 This alert indicates that the application has reached the minimum number of healthy pods required by its PodDisruptionBudget (PDB),so Kubernetes will not allow any additional voluntary pod evictions (for example, during a node drain or cluster upgrade) until another healthy pod becomes available.
 
+Alert condition:
+`max by (namespace, poddisruptionbudget) (kube_poddisruptionbudget_status_current_healthy == kube_poddisruptionbudget_status_desired_healthy and on (namespace, poddisruptionbudget) kube_poddisruptionbudget_status_expected_pods > 0)`
 
 ## Impact
 
