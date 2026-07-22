@@ -10,6 +10,8 @@ This alert indicates that the application has reached the minimum number of heal
 Alert condition:
 `max by (namespace, poddisruptionbudget) (kube_poddisruptionbudget_status_current_healthy == kube_poddisruptionbudget_status_desired_healthy and on (namespace, poddisruptionbudget) kube_poddisruptionbudget_status_expected_pods > 0)`
 
+The alert is generated when the number of healthy pods equals the minimum number of healthy pods required by the PodDisruptionBudget (Current Healthy = Desired Healthy), leaving no additional pods available for voluntary disruption. The alert is evaluated only for PDBs that protect one or more pods (Expected Pods > 0).
+
 ## Impact
 
 - OpenShift cannot safely drain the node hosting the pod. This stalls cluster updates, manual node drains, and autoscaling scale-downs.
