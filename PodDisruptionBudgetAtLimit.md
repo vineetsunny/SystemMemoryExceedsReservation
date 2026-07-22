@@ -18,13 +18,51 @@ Alert condition:
 
 ## Diagnosis
 
-| Action | Diagnosis | What to look for | 
-|--------|-----------|------------------|
-| Validate the affected PodDisruptionBudget | oc get pdb -n <ns>	| Find the PDB where ALLOWED DISRUPTIONS = 0 | 
-| View detailed PDB information |	oc describe pdb <pdb-name> -n <namespace>	| Check Current Healthy, Desired Healthy, and Allowed Disruptions.|
-| Verify the application pods protected by the PDB | oc get pods -n <namespace> -o wide | Confirm whether all pods are Running and Ready | 
-| Check the Deployment replica count | oc get deployment <deployment-name> -n <namespace> | Compare the configured replicas with the PDB requirements (minAvailable or maxUnavailable).|
-| Determine whether the alert is expected | Compare the Deployment and PDB configuration | If Allowed Disruptions = 0 because the application intentionally requires all replicas to remain available, no immediate action is required. Otherwise, review scaling or PDB configuration before maintenance activities.|
+**Step 1: Identify the affected PodDisruptionBudget**
+List all PodDisruptionBudgets in the affected namespace.
+
+`oc get pdb -n <namespace>`
+
+Verify:
+Identify the PDB associated with the alert.
+Check whether ALLOWED DISRUPTIONS is 0.
+
+**Step 2: Review the PodDisruptionBudget details**
+
+Display detailed information about the PDB.
+
+`oc describe pdb <pdb-name> -n <namespace>`
+
+Verify:<br>
+`Current`  --- Number of healthy pods that are currently Running and Ready. <br>
+`Desired`  --- Minimum number of healthy pods that must remain available <br>
+`Allowed Disruptions` --- Number of pods that can be voluntarily disrupted <br>
+
+This helps determine whether the PDB has exhausted its disruption budget.
+
+**Step 3: Verify the health of the application pods**
+
+Check the status of the pods protected by the PDB.
+
+`oc get pods -n <namespace> -o wide`
+
+Verify:
+
+All pods are in the Running state.
+All pods are Ready (READY = 1/1 or the expected value).
+
+If any pod is in Pending, CrashLoopBackOff, ImagePullBackOff, or NotReady, investigate and resolve the pod issue before proceeding.
+
+**Step 4: Verify the Deployment configuration**
+
+Check the Deployment managing the application.
+
+`oc get deployment <deployment-name> -n <namespace>`
+
+Verify:
+
+The configured number of replicas.
+Compare the replica count with the PDB configuration (minAvailable or maxUnavailable).
 
 
 ## Remediation
