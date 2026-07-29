@@ -601,7 +601,27 @@ Confirm that the **GuestFilesystemAlmostOutOfSpace** alert has cleared in Alertm
 * Expanding the PVC does **not** automatically expand the guest filesystem; the filesystem must also be resized from within the VM.
 * The appropriate resize command depends on the filesystem type (Btrfs, XFS, ext4, etc.).
 
+### Expression Logic
 
+1. Collect the used filesystem bytes
+
+```promql
+kubevirt_vmi_filesystem_used_bytes{...}
+```
+
+2. Collect the filesystem capacity
+
+```promql
+kubevirt_vmi_filesystem_capacity_bytes{...}
+```
+
+3. Calculate usage percentage
+
+```promql
+(used_bytes / capacity_bytes) * 100
+```
+
+4. Trigger a warning when usage is between 85% and 95%.
 
 
 **Dicision Flow**
