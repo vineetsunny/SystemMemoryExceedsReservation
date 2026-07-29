@@ -623,6 +623,8 @@ kubevirt_vmi_filesystem_capacity_bytes{...}
 
 4. Trigger a warning when usage is between 85% and 95%.
 
+- Excludes temporary and virtual filesystems.
+- Excludes the Windows "System Reserved" partition.
 
 **Dicision Flow**
 
