@@ -388,6 +388,222 @@ sudo rm -f /testfile
 * Expanding the PVC alone does **not** automatically increase the filesystem size inside the guest VM; the guest filesystem must also be resized.
 
 
+**Diagnosis**
+| Diagnosis (Commands) | What to Look For | Action |
+|----------------------|------------------|--------|
+| Connect to the VM using the OpenShift Console, `virtctl console <vm-name> -n <namespace>`, or `ssh <user>@<vm-ip>`. | Verify the VM is running and you can access the guest operating system. | Proceed with filesystem investigation. |
+| `df -h` | Identify the affected filesystem and confirm that its utilization matches the alert threshold (Warning: 85–95%, Critical: >95%). | Continue investigating the cause of the high disk utilization. |
+| `df -Th`<br/>or<br/>`lsblk -f` | Determine the filesystem type (for example, **btrfs**, **xfs**, or **ext4**) and identify the affected mount point. | Record the filesystem type for use during remediation if disk expansion is required. |
+| `du -xh / --max-depth=1 2>/dev/null \| sort -h` | Identify the top-level directories (for example, `/var`, `/home`, `/tmp`) consuming the most disk space. | Determine whether the usage is caused by logs, temporary files, backups, or application data. |
+| `find / -xdev -type f -size +100M -exec ls -lh {} \; 2>/dev/null` | Identify unusually large files contributing to high disk utilization. | Record the large files and determine whether they are expected or require cleanup. |
+| `oc get sc` | Verify whether the StorageClass backing the VM supports volume expansion (`ALLOWVOLUMEEXPANSION=true`). | Determine whether online volume expansion is supported if additional storage is required. |
+| `oc get pvc -n <namespace>` | Verify the VM's PVC is **Bound** and note its current capacity. | Confirm the PVC is healthy and identify the current disk size before planning any expansion. |
+
+**Remediation:**
+
+Here's a sequential **Remediation** section that is suitable for a runbook.
+
+## Remediation
+
+There are two possible remediation approaches:
+
+* **Option 1 (Recommended):** Free disk space by removing unnecessary files.
+* **Option 2:** Expand the virtual disk if additional storage is required.
+
+### Option 1: Free Disk Space
+
+1. Identify unnecessary files consuming disk space, such as:
+
+   * Temporary files
+   * Old log files
+   * Application caches
+   * Backup or archive files
+   * Unused application data
+
+2. Remove only the files that are no longer required.
+
+3. Verify that the filesystem utilization has dropped below the alert threshold.
+
+   ```bash
+   df -h
+   ```
+
+4. Confirm that the **GuestFilesystemAlmostOutOfSpace** alert clears automatically.
+
+---
+
+### Option 2: Expand the Virtual Disk
+
+Yes. This is an important caveat to include because **not every VM disk is expandable**. The operator should first identify the type of disk attached to the VM.
+
+You can add the following section before expanding the PVC.
+
+---
+
+### Step 2: Verify that the VM Disk Can Be Expanded
+
+Before attempting to resize the disk, identify the type of disk attached to the Virtual Machine.
+
+Only **PersistentVolumeClaim (PVC)-backed DataVolumes** support online expansion (provided the StorageClass supports volume expansion).
+
+The following disk types **cannot** be resized using this procedure:
+
+* **containerDisk** (read-only container image)
+* **Ephemeral disks**
+* Other non-expandable disk types
+
+You can verify the VM disk configuration by running:
+
+```bash
+oc get vm <vm-name> -n <namespace> -o yaml
+```
+
+Look for the `volumes` section.
+
+**Expandable (PVC/DataVolume-backed disk):**
+
+```yaml
+volumes:
+- dataVolume:
+  name: rootdisk
+```
+
+or
+
+```yaml
+volumes:
+- persistentVolumeClaim:
+    claimName: fedora-scarlet-haddock-20
+  name: rootdisk
+```
+
+These disks can be expanded by increasing the associated PVC size.
+
+**Not Expandable (containerDisk):**
+
+```yaml
+volumes:
+- containerDisk:
+  name: rootdisk
+```
+
+Since a `containerDisk` is read-only, its size cannot be increased. In this case, create a new VM with a larger disk or migrate the workload to a VM backed by a PVC/DataVolume.
+
+
+#### Step 1: Verify that the StorageClass supports volume expansion
+
+```bash
+oc get sc
+```
+
+Confirm that the StorageClass used by the VM has:
+
+```text
+ALLOWVOLUMEEXPANSION=true
+```
+
+---
+
+#### Step 2: Verify the PersistentVolumeClaim (PVC)
+
+```bash
+oc get pvc -n <namespace>
+```
+
+Ensure the PVC is in the **Bound** state.
+
+---
+
+#### Step 3: Expand the PVC
+
+Increase the requested storage size.
+
+Example:
+
+```bash
+oc patch pvc <pvc-name> -n <namespace> \
+--type merge \
+-p '{"spec":{"resources":{"requests":{"storage":"50Gi"}}}}'
+```
+
+---
+
+#### Step 4: Verify the PVC has been expanded
+
+```bash
+oc get pvc -n <namespace>
+```
+
+Confirm that the PVC reflects the new capacity.
+
+---
+
+#### Step 5: Determine the guest filesystem type
+
+```bash
+df -Th
+```
+
+or
+
+```bash
+lsblk -f
+```
+
+Identify whether the filesystem is **Btrfs**, **XFS**, or **ext4**.
+
+> **Note:** The filesystem resize command depends on the filesystem type.
+
+---
+
+#### Step 6: Resize the guest filesystem
+
+For **Btrfs**:
+
+```bash
+sudo btrfs filesystem resize max /
+```
+
+For **XFS**:
+
+```bash
+sudo xfs_growfs /
+```
+
+For **ext4**:
+
+```bash
+sudo resize2fs <device>
+```
+
+---
+
+#### Step 7: Validate the filesystem
+
+Verify that the additional storage is available and the utilization has decreased.
+
+```bash
+df -h
+```
+
+The filesystem should reflect the new capacity, and the usage should be below the alert threshold.
+
+---
+
+#### Step 8: Verify the alert is resolved
+
+Confirm that the **GuestFilesystemAlmostOutOfSpace** alert has cleared in Alertmanager or your monitoring dashboard.
+
+### Important Notes
+
+* Always consider **freeing disk space** before expanding the virtual disk.
+* Ensure the StorageClass supports **online volume expansion** (`ALLOWVOLUMEEXPANSION=true`) before resizing the PVC.
+* Expanding the PVC does **not** automatically expand the guest filesystem; the filesystem must also be resized from within the VM.
+* The appropriate resize command depends on the filesystem type (Btrfs, XFS, ext4, etc.).
+
+
+
+
 **Dicision Flow**
 
 flowchart TD
