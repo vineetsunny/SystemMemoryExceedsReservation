@@ -39,14 +39,24 @@ It will show the output as live migrate fail reason.
 ```
 
 # Remediation
-The default eviction strategy is `LiveMigrate`, which ensures that a virtual machine instance (VMI) is not interrupted if the node is placed into maintenance or drained.
 
-Set the evictionStrategy of the VMI to `LiveMigrateIfPossible` / `None` or resolve the issue that prevents the VMI from migrating.
+There are two supported approaches to resolve this alert:
 
-Update the VM to use the required eviction strategy:
+## Option 1: Restore Live Migratability (Preferred)
+
+The default eviction strategy is `LiveMigrate`, which ensures that a VirtualMachineInstance (VMI) is live migrated when the node is drained or placed into maintenance.
+
+If the VM is no longer live migratable, resolve the underlying issue preventing live migration. Once the VM becomes live migratable again, the alert is resolved and node maintenance can proceed without interrupting the VM.
+
+---
+
+## Option 2: Change the Eviction Strategy
+
+If restoring live migratability is not feasible, update the VM to use the `LiveMigrateIfPossible` (or `None`) eviction strategy. This allows node maintenance to continue even when the VM cannot be live migrated. During node drain, the VM will be stopped and restarted on another node instead of being live migrated.
 
 ```bash
 oc patch vm <VM_Name> -n <Namespace> --type=merge -p '{"spec":{"template":{"spec":{"evictionStrategy":"LiveMigrateIfPossible"}}}}'
+```
 ```
 
 # Decision Flow
