@@ -1,6 +1,6 @@
 # NodeFilesystemAlmostOutOfSpace
 
-**Prometheus Source:** `NodeFilesystemAlmostOutOfSpace` · **Severity:** `Warning / Critical` · **Duration For:** `30m` · [**Runbook**](https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/NodeFilesystemAlmostOutOfSpace.md)
+**Prometheus Source:** `node-exporter-rules` · **Severity:** `Warning / Critical` · **Duration For:** `30m` · [**Runbook**](https://github.com/openshift/runbooks/blob/master/alerts/cluster-monitoring-operator/NodeFilesystemAlmostOutOfSpace.md)
 
 ---
 
