@@ -1,144 +1,44 @@
-SystemMemoryExceedsReservation
+# SystemMemoryExceedsReservation
 
-Runbook · Tier 0 · warning · System memory usage ≥ 95% of reserved memory
+PrometheusRule Source: `machine-config-daemon` · Alert Severity: `warning` · Pending Period: `15m` · [Runbook](https://github.com/openshift/runbooks/blob/master/alerts/machine-config-operator/SystemMemoryExceedsReservation.md)
 
-Meaning
+---
 
-The node's system processes (such as kubelet, CRI-O, systemd, NetworkManager, sshd, etc.) are consuming more than 95% of the reserved system memory.
+## Meaning
 
+The node's system processes (such as kubelet, CRI-O, systemd, NetworkManager, sshd, etc.) are consuming more than 95% of the reserved system memory.<br>
 This does not necessarily mean the node is out of memory. It indicates that the reserved memory for critical node services is nearly exhausted, increasing the risk that these services may compete with application pods for memory.
 
-Impact
-Increased risk of node instability.
-Critical system services (kubelet, CRI-O) may become memory constrained.
-Increased probability of Out-Of-Memory (OOM) events affecting node services.
-Node may eventually become NotReady.
-Scheduler may overestimate available resources if reservation is too small for the workload.
+---
 
+## Impact
 
-Diagnosis
-## Variables (from alert)
+- Increased risk of node instability.
+- Critical system services (kubelet, CRI-O) may become memory constrained.
+- Increased probability of Out-Of-Memory (OOM) events affecting node services.
+- Node may eventually become NotReady.
+- Scheduler may overestimate available resources if reservation is too small for the workload.
+
+---
+
+## Diagnosis
+### Variables (from alert)
+
+***Step 1: Determine the current systemReserved memory***
 
 ```bash
-NODE=<labels.node>
+oc debug node/<NODE> --chroot /host bash -c 'grep "^SYSTEM_RESERVED_MEMORY=" /etc/node-sizing.env'
 ```
 
-| Diagnosis | What to look for | Cause | Action |
-|------------|------------------|--------|--------|
-| `oc debug node/$NODE -- cat /host/etc/kubernetes/kubelet.conf \| grep -A5 systemReserved` | Memory reservation too small (for example, `1Gi` on a busy node) | `LOW_RESERVATION` | Review `systemReserved.memory` and increase the reservation if required. |
+***Step 2: Identify what is consuming the reserved memory***
 
+```bash
+oc debug node/$NODE 
+chroot /host
+```
+Check memory status for all major processes:
 
-Look for
-
-systemReserved:
-  cpu: 500m
-  memory: 1Gi
-Check actual system memory usage
-oc get --raw /api/v1/nodes/$NODE/proxy/stats/summary
-
-Review
-
-kubelet
-runtime (CRI-O)
-other system containers
-Check node conditions
-oc describe node $NODE
-
-Look for
-
-MemoryPressure=True
-Check pod density
-oc get pods -A --field-selector spec.nodeName=$NODE --no-headers | wc -l
-Check node utilization
-oc adm top node $NODE
-Check recent node events
-oc get events \
---field-selector involvedObject.kind=Node,involvedObject.name=$NODE \
---sort-by='.lastTimestamp'
-Mitigation
-LOW_RESERVATION
-
-If the node is consistently using more than 95% of the reserved memory:
-
-Increase systemReserved.memory using a KubeletConfig.
-Follow the Red Hat sizing guidance or enable automatic reservation (OCP 4.8+).
-HIGH_POD_DENSITY
-
-If the node hosts a very large number of pods:
-
-Reduce pod density (if possible), or
-Increase systemReserved.memory.
-NODE_MEMORY_PRESSURE
-
-If the node itself is under memory pressure:
-
-Investigate workloads consuming excessive memory.
-Review recent deployments.
-Check for memory leaks.
-Consider redistributing workloads.
-EXPECTED_SYSTEM_USAGE
-
-If kubelet/CRI-O legitimately require more memory (large clusters, frequent pod churn, heavy image pulls):
-
-Increase the reservation.
-Monitor after the change.
-UNKNOWN
-
-Escalate to Platform SRE for further investigation.
-
-Cause → Notify
-Cause	Notify
-LOW_RESERVATION	Platform SRE
-HIGH_POD_DENSITY	Platform SRE
-NODE_MEMORY_PRESSURE	Platform SRE
-KUBELET_HIGH_USAGE	Platform SRE
-CRIO_HIGH_USAGE	Platform SRE
-EXPECTED_SYSTEM_USAGE	Platform SRE
-NODE_RESOURCE_PRESSURE	Platform SRE
-UNKNOWN	Platform SRE
-
-Notes
-This alert is an early warning, not necessarily an outage.
-It monitors system.slice memory usage (system processes), not pod memory usage.
-Increasing systemReserved.memory does not add more RAM to the node; it reserves a larger portion of existing memory for critical node services, reducing the memory available for scheduling application pods. This helps prevent kubelet and other system services from being starved under heavy load.
-
-Set Manually:
-
-apiVersion: machineconfiguration.openshift.io/v1
-kind: KubeletConfig
-metadata:
-  name: set-allocatable
-spec:
-  autoSizingReserved: false
-  machineConfigPoolSelector:
-    matchLabels:
-      pools.operator.machineconfiguration.openshift.io/worker: ""
-  kubeletConfig:
-    systemReserved:
-      cpu: 1000m
-      memory: 4Gi
-      ephemeral-storage: 50Mi
-#...
-
-Automatic allocation:
-
-If you updated your cluster from a version earlier than 4.21, automatic allocation of system resources is disabled by default. To enable the feature, delete the 50-worker-auto-sizing-disabled machine config.
-
-
-
--------
-
-See what processes consuming RSS (anon)
-
-
-How to identify how much memory left on each node: (RSS)
-
-oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
-  curl -s http://localhost:9090/api/v1/query --data-urlencode \
-  'query=(sum(kube_node_status_capacity{resource="memory"} - kube_node_status_allocatable{resource="memory"}) by (node) * 0.95) - sum(container_memory_rss{id="/system.slice"}) by (node)' | jq '.data.result[] | {node: .metric.node, megabytes_left_before_alert: ((.value[1] | tonumber) / 1024 / 1024)}'
-
-How to identify how much memory consumed by processes in RSS.:
-
+```bash
 ps -eo pid,user,rss,cmd --sort=-rss | grep -E "PID|crio|kubelet|systemd|NetworkManager|python" | head -n 15 | awk '
 NR==1 {print $1, $2, "RSS_MEMORY", $4; next} 
 {
@@ -149,142 +49,74 @@ NR==1 {print $1, $2, "RSS_MEMORY", $4; next}
     printf "%-6s %-8s %-10.2f MB %s\n", $1, $2, rss/1024, $4
   }
 }'
+```
+***Step 3: Compare on each node level how much memory left under Resident Set Size***
 
+```bash
+oc exec -n openshift-monitoring prometheus-k8s-0 -c prometheus -- \
+  curl -s http://localhost:9090/api/v1/query --data-urlencode \
+  'query=(sum(kube_node_status_capacity{resource="memory"} - kube_node_status_allocatable{resource="memory"}) by (node) * 0.95) - sum(container_memory_rss{id="/system.slice"}) by (node)' | jq '.data.result[] | {node: .metric.node, megabytes_left_before_alert: ((.value[1] | tonumber) / 1024 / 1024)}'
+```
 
-------
-runbook - https://github.com/openshift/runbooks/blob/master/alerts/machine-config-operator/SystemMemoryExceedsReservation.md
+This displays the remaining system memory available on each node before the alert threshold is reached.
 
+***Step 4: Determine whether the memory usage is expected***
 
-----
+Areas the investigate:
 
-flowchart TD
+- Is the node running significantly more Pods than usual?<br>
+- Is the workload memory-intensive?<br>
+- Is the increase temporary or sustained?<br>
+- Is there evidence of a memory leak or abnormal process behavior?<br>
+- If memory usage is not expected, Investigate and resolve the offending process.
 
-A["🚨 SystemMemoryExceedsReservation Alert"]
-A --> B["Find system.slice consumers"]
-B --> C["Collect RSS usage"]
-C --> D["Analyze top consumers"]
+If memory usage is expected, the node legitimately requires more host memory. Proceed with increasing systemReserved, Follow `Mitigation` Section for more information.
 
-D --> E{"Expected memory usage?"}
+---
 
-E -->|No| F["Investigate process"]
-F --> G["Identify root cause"]
-G --> H["Fix issue"]
-H --> I["Monitor RSS"]
-I --> J["✅ Alert resolved"]
+# Mitigation:
 
-E -->|Yes| K["Increase systemReserved"]
-K --> L{"Reservation method"}
+**Note:**<br>The mitigation requires a MachineConfig/KubeletConfig update which triggers a reboot on the nodes. Schedule the change during a maintenance window, as it may result in temporary service disruption or downtime.
 
-L -->|Static| M["Configure KubeletConfig"]
-L -->|Dynamic| N["Enable Dynamic Reservation"]
+By default, OpenShift reserves 1GB of memory for system components on each node. If this reservation is insufficient for workload,update it by creating or updating a kubelet custom resource. To manually set resource values, you must use a kubelet configuration as mentioned below in sample configuration for worker nodes:
 
-M --> O["Apply configuration"]
-N --> O
+### Manual Allocation:
 
-O --> P["MachineConfig rollout"]
-P --> Q["Validate configuration"]
-Q --> R["✅ Alert cleared"]
+apiVersion: machineconfiguration.openshift.io/v1
+kind: KubeletConfig
+metadata:
+  name: set-allocatable
+spec:
+  machineConfigPoolSelector:
+    matchLabels:
+      pools.operator.machineconfiguration.openshift.io/worker: ""
+  kubeletConfig:
+    systemReserved:
+      cpu: 1000m
+      memory: 3Gi
+#...
 
+Similary, for master nodes the `matchlabels` entry would be change to `pools.operator.machineconfiguration.openshift.io/master: ""`
 
+### Automatic allocation:
 
--------------------
+Starting with Openshift 4.21, the automatic reservation is configured by default for newly installed clusters. If you updated your cluster from a version earlier than 4.21, automatic allocation of system resources is disabled by default. To enable this feature, delete the "50-worker-auto-sizing-disabled" machine config.
 
-Step 1: Determine the current systemReserved memory
+- Confirm the availability of Machine Config:
+```bash
+oc get mc | grep 50
+```
+- Delete Machine Config for master and worker:
+```bash
+oc delete mc 50-master-auto-sizing-disabled
+oc delete mc 50-worker-auto-sizing-disabled
+```
 
-The alert compares the memory used by system processes against the memory reserved by the kubelet.
+For more information, refer [OpenShift Doc](https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/nodes/working-with-nodes#nodes-nodes-resources-configuring).
 
-First, determine how much memory is reserved on the node.
+---
 
-Check node capacity and allocatable memory
-oc get node <node-name> -o jsonpath='{.status.capacity.memory}{"\n"}{.status.allocatable.memory}{"\n"}'
-
-Calculate:
-
-System Reserved Memory = Capacity - Allocatable
-
-For example:
-
-Capacity	Allocatable	System Reserved
-8 GiB	7 GiB	1 GiB
-Step 2: Identify what is consuming the reserved memory
-
-The alert monitors system.slice, so begin by identifying the host processes consuming memory.
-
-View top RSS consumers
-ps -eo pid,user,comm,rss --sort=-rss
-Identify services running in system.slice
-systemd-cgls /system.slice
-View memory usage of system.slice
-cat /sys/fs/cgroup/system.slice/memory.current
-View memory breakdown
-cat /sys/fs/cgroup/system.slice/memory.stat
-
-Useful fields include:
-
-anon
-file
-slab
-kernel_stack
-pagetables
-Step 3: Identify the high memory consumer and investigate
-
-Determine which process is consuming the majority of the reserved memory.
-
-Process	Typical Reason	Investigation
-kubelet	Large number of Pods, many volumes, frequent Pod lifecycle events	Check Pod density, kubelet logs, kubelet configuration, excessive Pod churn
-CRI-O	Large number of running containers/images	Check running containers, image garbage collection, container lifecycle
-OVN-Kubernetes	Heavy networking load, many Services/Pods	Check OVN logs, networking scale, OVN database health
-metrics-server	Large clusters or heavy metrics collection	Verify expected cluster size and metrics load
-systemd-journald	Excessive logging	Review journal size and log volume
-Node Exporter	Usually low memory	Normally no action required
-NetworkManager	Network issues or configuration changes	Review NetworkManager logs
-Python/Custom Process	Test process, memory leak, custom application	Investigate the application or terminate if unnecessary
-
-Also evaluate Kubernetes workload memory:
-
-oc adm top node
-
-oc adm top pods -A
-
-oc adm top pods -A --containers
-
-High workload density often increases memory usage of kubelet, CRI-O, and networking components.
-
-Step 4: Determine whether the memory usage is expected
-
-Ask the following:
-
-Is the node running significantly more Pods than usual?
-Is the workload memory-intensive?
-Is the increase temporary or sustained?
-Is there evidence of a memory leak or abnormal process behavior?
-If memory usage is not expected
-
-Investigate and resolve the offending process:
-
-Memory leak
-Excessive logging
-Misconfiguration
-Runaway process
-Software bug
-
-Continue monitoring after remediation.
-
-If memory usage is expected
-
-The node legitimately requires more host memory.
-
-Proceed with increasing systemReserved.
-
-Step 5: Resize systemReserved
-
-
-
-
-
-
---------------
-
+## Decision Flow
 
 ```mermaid
 
