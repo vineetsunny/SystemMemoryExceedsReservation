@@ -138,7 +138,7 @@ done
 
 Keep monitoring the cluster and observe the behavior of the ConfigMap creation requests and the validating webhook.
 
-Observe>Metrics (Using GUI)
+***Using GUI -*** Observe > Metrics
 
 ```bash
 sum:apiserver_request:burnrate1h 
@@ -147,7 +147,7 @@ sum:apiserver_request:burnrate1h
 sum:apiserver_request:burnrate5m
 ```
 
-Or (Using CLI)
+***Or (Using CLI)***
 
 ```bash
 watch -n 30 '
