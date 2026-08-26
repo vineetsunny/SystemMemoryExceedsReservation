@@ -63,7 +63,7 @@ NAME                    HOLDER                    AGE
 ovn-kubernetes-master   invalid-nonexistent-pod   18h
 ```
 
-***Step 5: Track Alert Status - after 10 Min***
+***Step 5: Track Alert Status - after 5 Min***
 
 GUI: Observe > Alerts
 ![](assets/17876559441250.jpg)
