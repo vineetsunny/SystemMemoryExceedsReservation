@@ -1,15 +1,25 @@
 **1. Deploy an NGINX application with 2 replicas.**
+
 ```bash
-apiVersion: policy/v1
-kind: PodDisruptionBudget
+apiVersion: apps/v1
+kind: Deployment
 metadata:
-  name: nginx-demo-pdb
+  name: nginx-demo
 spec:
-  minAvailable: 2
+  replicas: 2
   selector:
     matchLabels:
       app: nginx-demo
+  template:
+    metadata:
+      labels:
+        app: nginx-demo
+    spec:
+      containers:
+      - name: nginx
+        image: nginx
 ```
+
 Result:
 ```bash
 oc get pods -n default
