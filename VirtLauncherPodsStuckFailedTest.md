@@ -1,6 +1,7 @@
 # Reproduce VirtLauncherPodsStuckFailed Alert
 
 This alert fires when at least 200 virt-launcher Pods remain in the Failed phase for 10 minutes.
+The alert is designed to detect a situation where 200 or more virt-launcher Pods remain in the Failed state for at least 10 minutes. This can indicate a large-scale VM workload failure or an underlying infrastructure/KubeVirt issue that is preventing VM workloads from recovering.
 
 ---
 
