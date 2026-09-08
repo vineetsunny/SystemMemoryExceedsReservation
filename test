@@ -1,0 +1,527 @@
+1. First verify that the metrics exist
+
+Start by querying the Prometheus endpoint from the openshift-monitoring namespace:
+
+oc -n openshift-monitoring exec prometheus-k8s-0 -- \
+  curl -s 'http://localhost:9090/api/v1/query?query=vsphere_xcopy_volume_populator_progress' \
+  | jq .
+
+Or get only the useful labels and values:
+
+oc -n openshift-monitoring exec prometheus-k8s-0 -- \
+  curl -sG 'http://localhost:9090/api/v1/query' \
+  --data-urlencode 'query=vsphere_xcopy_volume_populator_progress' \
+  | jq -r '.data.result[] |
+    [.metric.owner_uid, .metric.pod, .metric.namespace, .value[1]] |
+    @tsv'
+
+You should get something similar to:
+
+PVC_UID                              POD                         NAMESPACE       PROGRESS
+abc123...                            xcopy-populator-xxxxx       openshift-mtv  37
+def456...                            xcopy-populator-yyyyy       openshift-mtv  82
+
+If this returns nothing, don't proceed with the queries yet. First determine whether the MTV metrics are actually being scraped.
+
+2. Find the PVC UID
+
+The AI-generated solution refers to:
+
+owner_uid="<pvc-uid>"
+
+So first identify the PVC associated with the disk being migrated.
+
+For example:
+
+oc get pvc -A
+
+Then:
+
+oc get pvc <PVC_NAME> -n <NAMESPACE> \
+  -o jsonpath='{.metadata.uid}{"\n"}'
+
+Example:
+
+oc get pvc winvm-disk-0 -n openshift-mtv \
+  -o jsonpath='{.metadata.uid}{"\n"}'
+
+Output:
+
+8c4f2d5a-....
+
+Now use that UID in Prometheus.
+
+3. Check disk-transfer progress
+
+Run:
+
+vsphere_xcopy_volume_populator_progress{
+  owner_uid="<PVC_UID>"
+}
+
+For example:
+
+vsphere_xcopy_volume_populator_progress{
+  owner_uid="8c4f2d5a-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+}
+
+You might get:
+
+42
+
+That means approximately 42% of the disk transfer has completed.
+
+You can also query directly from OpenShift:
+
+oc -n openshift-monitoring exec prometheus-k8s-0 -- \
+  curl -sG 'http://localhost:9090/api/v1/query' \
+  --data-urlencode \
+  'query=vsphere_xcopy_volume_populator_progress{owner_uid="8c4f2d5a-xxxx-xxxx-xxxx-xxxxxxxxxxxx"}' \
+  | jq -r '.data.result[] | .value[1]'
+4. Calculate ETA
+
+Once you have progress, check whether progress is actually increasing.
+
+Use:
+
+deriv(
+  vsphere_xcopy_volume_populator_progress{
+    owner_uid="<PVC_UID>"
+  }[5m]
+)
+
+Suppose:
+
+deriv = 0.20
+
+That means approximately:
+
+0.20 percentage points/second
+
+If current progress is 40%:
+
+remaining = 100 - 40
+          = 60%
+
+ETA:
+
+60 / 0.20 = 300 seconds
+
+So approximately:
+
+5 minutes remaining
+
+The complete PromQL expression is:
+
+(
+  100 -
+  vsphere_xcopy_volume_populator_progress{
+    owner_uid="<PVC_UID>"
+  }
+)
+/
+deriv(
+  vsphere_xcopy_volume_populator_progress{
+    owner_uid="<PVC_UID>"
+  }[5m]
+)
+Important
+
+Don't use the ETA blindly.
+
+If:
+
+deriv(...) <= 0
+
+then the transfer is not progressing, and the ETA is either meaningless or infinite.
+
+So I'd actually use:
+
+(
+  100 - vsphere_xcopy_volume_populator_progress{owner_uid="<PVC_UID>"}
+)
+/
+deriv(
+  vsphere_xcopy_volume_populator_progress{owner_uid="<PVC_UID>"}[5m]
+)
+
+only when:
+
+deriv(
+  vsphere_xcopy_volume_populator_progress{owner_uid="<PVC_UID>"}[5m]
+) > 0
+5. Detect whether XCOPY/offload was used
+
+Check:
+
+vsphere_xcopy_volume_populator_xcopy_used{
+  owner_uid="<PVC_UID>"
+}
+
+You may see:
+
+1
+
+or:
+
+0
+
+Typically:
+
+Value	Interpretation
+1	XCOPY/offload was used
+0	XCOPY was not used; software-copy path/fallback
+
+So you can query all affected disks:
+
+vsphere_xcopy_volume_populator_xcopy_used == 0
+
+However, be careful with this metric while the migration is still running. A value of 0 isn't necessarily proof that the migration has failed. You should correlate it with the migration state and terminal status.
+
+6. Check whether the migration actually failed
+
+First look at the MTV migration resources.
+
+For example:
+
+oc get migration -A
+
+Depending on your MTV version/API, you can inspect the migration:
+
+oc get migration <MIGRATION_NAME> -n <NAMESPACE> -o yaml
+
+You can also check:
+
+oc get plan -A
+
+and:
+
+oc get vm.forklift.konveyor.io -A
+
+For Prometheus, check:
+
+ALERTS{
+  alertname="MigrationFailed",
+  alertstate="firing"
+}
+
+You can make the result easier to read:
+
+oc -n openshift-monitoring exec prometheus-k8s-0 -- \
+  curl -sG 'http://localhost:9090/api/v1/query' \
+  --data-urlencode 'query=ALERTS{alertname="MigrationFailed",alertstate="firing"}' \
+  | jq -r '.data.result[] |
+    [.metric.plan_name,
+     .metric.phase,
+     .metric.mode,
+     .metric.provider,
+     .metric.status,
+     .value[1]] |
+    @tsv'
+
+This is useful because you can get information such as:
+
+PLAN             PHASE           MODE       PROVIDER    STATUS
+vmware-to-ocp    CopyDisks       live       vmware      Failed
+7. Detect a stuck disk transfer
+
+This is one of the most useful queries for your runbook.
+
+Run:
+
+deriv(
+  vsphere_xcopy_volume_populator_progress{
+    owner_uid="<PVC_UID>"
+  }[15m]
+) == 0
+
+But I'd recommend adding the progress condition:
+
+deriv(
+  vsphere_xcopy_volume_populator_progress{
+    owner_uid="<PVC_UID>"
+  }[15m]
+) == 0
+and
+vsphere_xcopy_volume_populator_progress{
+  owner_uid="<PVC_UID>"
+} < 100
+
+This means:
+
+The transfer has not progressed during the last 15 minutes and has not completed.
+
+Better production alert
+
+Create an alerting rule:
+
+groups:
+- name: mtv-storage-offload
+  rules:
+
+  - alert: MTVXCopyTransferStuck
+    expr: |
+      deriv(
+        vsphere_xcopy_volume_populator_progress[15m]
+      ) == 0
+      and
+      vsphere_xcopy_volume_populator_progress < 100
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MTV XCOPY volume transfer appears stuck"
+      description: "XCOPY volume transfer for PVC owner {{ $labels.owner_uid }} has not progressed for 25 minutes."
+
+Why 25 minutes?
+
+15 minutes = measurement window
+10 minutes = alert 'for' duration
+
+This reduces false positives from temporary metric/reporting gaps.
+
+8. Check source disk size
+
+First verify that this metric exists:
+
+vsphere_xcopy_volume_populator_source_disk_bytes
+
+For a specific PVC:
+
+vsphere_xcopy_volume_populator_source_disk_bytes{
+  owner_uid="<PVC_UID>"
+}
+
+Convert to GiB:
+
+vsphere_xcopy_volume_populator_source_disk_bytes{
+  owner_uid="<PVC_UID>"
+} / 1024 / 1024 / 1024
+
+For example:
+
+2147483648000 bytes
+
+would be approximately:
+
+2000 GiB
+9. Calculate effective transfer throughput
+
+If your duration metric is available:
+
+mtv_vsphere_xcopy_volume_populator_copy_duration_seconds{
+  owner_uid="<PVC_UID>"
+}
+
+then:
+
+vsphere_xcopy_volume_populator_source_disk_bytes{
+  owner_uid="<PVC_UID>"
+}
+/
+mtv_vsphere_xcopy_volume_populator_copy_duration_seconds{
+  owner_uid="<PVC_UID>"
+}
+
+gives bytes/sec.
+
+Convert to MiB/sec:
+
+(
+  vsphere_xcopy_volume_populator_source_disk_bytes{
+    owner_uid="<PVC_UID>"
+  }
+  /
+  mtv_vsphere_xcopy_volume_populator_copy_duration_seconds{
+    owner_uid="<PVC_UID>"
+  }
+)
+/1024/1024
+
+For example:
+
+2 TB / 10,000 sec
+
+approximately:
+
+200 MB/s
+
+This is much more useful than looking at copy duration alone.
+
+10. Correlate PVC → VM → Migration → Plan
+
+This is the most important part of the AI-generated answer.
+
+Prometheus probably won't directly give you:
+
+Plan
+  ↓
+VM
+  ↓
+PVC
+  ↓
+XCOPY transfer
+
+with all attributes in one metric.
+
+You therefore need to establish the relationship.
+
+A useful troubleshooting flow is:
+
+MTV Plan
+   │
+   ├── VM
+   │
+   └── Migration
+          │
+          └── VM migration status
+                   │
+                   └── PVC
+                          │
+                          └── owner_uid
+                                 │
+                                 └── XCOPY metrics
+
+Start with:
+
+oc get plan -A
+
+Then:
+
+oc get migration -A
+
+Then inspect the migration:
+
+oc get migration <MIGRATION_NAME> \
+  -n <NAMESPACE> -o yaml
+
+Then identify the VM:
+
+oc get vm -A
+
+And inspect the VM migration status:
+
+oc get vm.forklift.konveyor.io <VM_NAME> \
+  -n <NAMESPACE> -o yaml
+11. Check phase-by-phase VM migration status
+
+The command from your generated solution is useful:
+
+oc get vm.forklift.konveyor.io <VM_NAME> \
+  -n <PLAN_NAMESPACE> \
+  -o jsonpath='{.status.migration.vms[0].pipeline}'
+
+For easier troubleshooting, I'd initially use:
+
+oc get vm.forklift.konveyor.io <VM_NAME> \
+  -n <NAMESPACE> -o yaml
+
+and locate:
+
+status:
+  migration:
+    vms:
+
+You should inspect the pipeline entries for information such as:
+
+step name
+phase
+progress
+completed
+total
+started
+completed
+
+This allows you to determine something like:
+
+VM: Windows-VM01
+CPU: 16
+Memory: 32 GiB
+Disk: 2 TiB
+
+Pipeline:
+
+DiskAllocation     Completed
+DiskTransfer       Running       63%
+ConvertGuest        Pending
+PowerOn             Pending
+
+That's considerably more useful for an RCA than simply saying:
+
+Migration is running
+12. Recommended Prometheus dashboard
+
+For the migration monitoring you're building, I'd create the dashboard around these panels:
+
+Panel	PromQL / Data	Purpose
+Disk transfer progress	vsphere_xcopy_volume_populator_progress	Current %
+Transfer ETA	(100-progress)/deriv(progress[5m])	Estimated remaining time
+Transfer throughput	source_disk_bytes / copy_duration_seconds	Effective throughput
+XCOPY used	vsphere_xcopy_volume_populator_xcopy_used	Offload vs fallback
+Stuck transfer	deriv(progress[15m]) == 0	Detect stalled transfer
+Migration failed	ALERTS{alertname="MigrationFailed"}	Detect failure
+Source disk size	source_disk_bytes	Disk being transferred
+VM migration phase	MTV VM status	Current migration stage
+13. For your 2-TB / 16-vCPU / 32-GiB VM
+
+I'd structure the monitoring output approximately like this:
+
+VM:        VM01
+Plan:      VMware-to-OCP
+CPU:       16 vCPU
+Memory:    32 GiB
+Disk:      2 TiB
+
+Migration status
+------------------------------------------------
+DiskAllocation       Completed
+DiskTransfer         Running
+ConvertGuest         Pending
+PowerOn              Pending
+
+Disk transfer
+------------------------------------------------
+Progress:             63%
+XCOPY:                Enabled
+Throughput:           185 MiB/s
+Estimated remaining:  ~32 minutes
+
+Health
+------------------------------------------------
+Progress moving:      YES
+Transfer stuck:       NO
+Migration failed:     NO
+XCOPY fallback:       NO
+
+This gives you a much better operational view.
+
+14. One important correction to the generated solution
+
+I would not immediately build the final alert/dashboard around the exact metric names in that AI-generated response.
+
+First verify all of these individually in your cluster:
+
+vsphere_xcopy_volume_populator_progress
+vsphere_xcopy_volume_populator_xcopy_used
+vsphere_xcopy_volume_populator_source_disk_bytes
+mtv_vsphere_xcopy_volume_populator_copy_duration_seconds
+mtv_plan_alert_status
+ALERTS{alertname="MigrationFailed"}
+
+Especially verify whether the duration metric is actually called:
+
+mtv_vsphere_xcopy_volume_populator_copy_duration_seconds
+
+or has a different name in your MTV installation.
+
+A good next step
+
+Since you're already testing MTV migrations, run this single command first:
+
+oc -n openshift-monitoring exec prometheus-k8s-0 -- \
+  curl -sG 'http://localhost:9090/api/v1/label/__name__/values' \
+  | jq -r '.data[]' | grep -Ei 'mtv|xcopy|migration'
+
+That will give you all metric names currently known to Prometheus containing mtv, xcopy, or migration.
+
+From that output, we can identify exactly which metrics your MTV installation exposes and then build the correct PromQL for ETA, stuck migration, throughput, failure, phase, and VM-size correlation rather than relying on potentially incorrect metric names.
