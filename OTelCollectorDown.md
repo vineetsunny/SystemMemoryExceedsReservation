@@ -66,7 +66,6 @@ After applying the applicable remediation:
 - Prometheus target shows health="up" with no scrape error.
 
 ```bash
-oc -n openshift-monitoring exec prometheus-k8s-0 -- \
-  curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.labels.job=="<ServiceMonitor>") | {health, scrapeUrl, lastError}'
+oc -n openshift-monitoring exec prometheus-k8s-0 -- curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.labels.job | test("otel"; "i")) | {job: .labels.job, health, scrapeUrl, lastError}'
 ```
 - The alert clears after its configured evaluation period.
