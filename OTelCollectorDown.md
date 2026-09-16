@@ -33,8 +33,8 @@ If the OpenTelemetry Collector is unavailable or its metrics endpoint cannot be 
 
 | Command | What to look for | Purpose |
 |---|---|---|
-| `oc -n openshift-user-workload-monitoring exec "$POD" -- curl -sG 'http://localhost:9090/api/v1/query' --data-urlencode 'query=up{job="otel-collector-monitoring"}'` | `up = 0` | Confirm Prometheus cannot successfully scrape the Collector metrics target. |
-| `oc -n openshift-user-workload-monitoring exec "$POD" -- curl -s http://localhost:9090/api/v1/targets` | Collector target; `health`; `scrapeUrl`; `lastError` | Identify **why Prometheus considers the Collector target down**. This should be the main starting point. |
+| `oc -n openshift-monitoring exec prometheus-k8s-0 -- curl -sG 'http://localhost:9090/api/v1/query' --data-urlencode 'query=up{job="otel-collector-monitoring"}'` | `up = 0` | Confirm Prometheus cannot successfully scrape the Collector metrics target. |
+| `oc -n openshift-monitoring exec prometheus-k8s-0 -- curl -s http://localhost:9090/api/v1/targets` | Collector target; `health`; `scrapeUrl`; `lastError` | Identify **why Prometheus considers the Collector target down**. This should be the main starting point. |
 | `oc -n observability get pod -l app=otel-collector -o wide` | Pod is `Running/Ready`; pod IP; restart count | Confirm the Collector pod itself is still running and identify the pod being investigated. |
 | `oc -n observability exec <collector-pod> -c otc-container -- sh -c 'grep "^State:" /proc/1/status'` | OpenTelemetry Collector process is running OR stopped (T) | Determine whether the process inside the running pod is stopped, paused, or abnormal. |
 | `oc -n observability port-forward pod/<collector-pod> 8888:8888 >/tmp/otel-port-forward.log 2>&1 & PF_PID=$!` followed by `curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8888/metrics` | HTTP `200` vs connection refused/timeout/error | Confirm whether the Collector's **metrics endpoint itself is responding**. |
@@ -67,7 +67,7 @@ After applying the applicable remediation:
 - Prometheus target shows health="up" with no scrape error.
 
 ```bash
-oc -n openshift-user-workload-monitoring exec prometheus-user-workload-0 -- \
+oc -n openshift-monitoring exec prometheus-k8s-0 -- \
   curl -s http://localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.labels.job=="<ServiceMonitor>") | {health, scrapeUrl, lastError}'
-```
+``` 
 - The alert clears after its configured evaluation period.
