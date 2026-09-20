@@ -1,0 +1,6 @@
+oc get prometheusrules -A -o json | jq -r '
+  .items[] as $rule |
+  $rule.spec.groups[] as $group |
+  $group.rules[] |
+  select(.alert != null) |
+  "Namespace: \($rule.metadata.namespace)\nAlert: \(.alert)\nExpression: \(.expr)\n---"
