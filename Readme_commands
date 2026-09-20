@@ -4,3 +4,22 @@ oc get prometheusrules -A -o json | jq -r '
   $group.rules[] |
   select(.alert != null) |
   "Namespace: \($rule.metadata.namespace)\nAlert: \(.alert)\nExpression: \(.expr)\n---"
+
+
+
+
+oc get prometheusrules -A -o json | jq -r '
+  ["Namespace", "Alert Name", "Severity", "Duration", "Expression"],
+  (.items[] as $rule |
+   $rule.spec.groups[] as $group |
+   $group.rules[] |
+   select(.alert != null) |
+   [
+     $rule.metadata.namespace,
+     .alert,
+     (.labels.severity // "N/A"),
+     (.for // "N/A"),
+     (.expr | tostring)
+   ]) |
+  @csv
+' > openshift-4.22-alert-rules.csv
