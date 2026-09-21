@@ -12,7 +12,7 @@ oc get prometheusrules -A -o json | jq -r '
   .rules[] |
   select(.alert != null) |
   "Alert Name: \(.alert)\nExpression: \(.expr)\nDescription: \(.annotations.description // "N/A")\n---"
-'
+' | grep -A 2 -B 0 "Alert Name: KubePodCrashLooping"
 
 
 
