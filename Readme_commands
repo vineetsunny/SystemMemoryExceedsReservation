@@ -6,6 +6,15 @@ oc get prometheusrules -A -o json | jq -r '
   "Namespace: \($rule.metadata.namespace)\nAlert: \(.alert)\nExpression: \(.expr)\n---"
 
 
+oc get prometheusrules -A -o json | jq -r '
+  .items[] as $rule |
+  $rule.spec.groups[] |
+  .rules[] |
+  select(.alert != null) |
+  "Alert Name: \(.alert)\nExpression: \(.expr)\nDescription: \(.annotations.description // "N/A")\n---"
+'
+
+
 
 
 oc get prometheusrules -A -o json | jq -r '
