@@ -23,3 +23,6 @@ oc get prometheusrules -A -o json | jq -r '
    ]) |
   @csv
 ' > openshift-4.22-alert-rules.csv
+
+
+https://redhatsupport.lightning.force.com/lightning/r/Case/500Nr00000xVDyIIAW/view
