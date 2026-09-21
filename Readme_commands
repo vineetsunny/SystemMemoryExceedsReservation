@@ -26,3 +26,4 @@ oc get prometheusrules -A -o json | jq -r '
 
 
 https://redhatsupport.lightning.force.com/lightning/r/Case/500Nr00000xVDyIIAW/view
+https://access.redhat.com/support/cases/#/case/list?query=%20orderBy%20lastModifiedDate%20desc&p=1&size=10&searchType=basic
