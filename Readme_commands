@@ -54,3 +54,53 @@ while IFS= read -r metric; do
     echo "FOUND     | $metric | series=$count"
   fi
 done < metrics.txt
+
+
+storage_arrays.usable_srp_tib
+storage_arrays.total_capacity_tib
+storage_arrays.physical_used_tib
+storage_arrays.provisioned_tib
+storage_arrays.ocp_tib
+storage_arrays.usable_srp_tib
+storage_arrays.pool_total_tib
+storage_arrays.pool_used_tib
+node_ready
+region
+ready_nodes
+nodes_not_ready
+ready_pods
+pods_not_ready
+vms
+deployments_healthy
+deployments_degraded
+namespaces_at_risk
+namespaces_healthy
+cpu_used_pct
+mem_used_pct
+excludes loop
+disk_used_pct
+calculates RX
+node_namespace_pod:kube_pod_info
+ovnkube_controller_workqueue_retries_total
+storage_arrays.usable_srp_tib
+storage_arrays.physical_used_tib
+storage_arrays.total_capacity_tib
+storage_arrays.provisioned_tib
+storage_arrays.usable_srp_tib
+storage_arrays.ocp_tib
+storage_arrays.usable_srp_tib
+storage_arrays.pool_total_tib
+storage_arrays.pool_used_tib
+job_status
+otel_system_cpu_utilization
+otel_system_memory_utilization
+otel_system_network_io
+otel_system_disk_io
+prime_orphan_period
+prime_orphan_trend
+deleted_pvc
+ovnkube_controller_workqueue_retries_total
+node_hwmon_temp_alarm
+node_hwmon_temp_alarm
+node_hwmon_temp_crit_alarm
+node_hwmon_temp_crit_alarm
