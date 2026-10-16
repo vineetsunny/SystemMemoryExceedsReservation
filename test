@@ -524,4 +524,14 @@ oc -n openshift-monitoring exec prometheus-k8s-0 -- \
 
 That will give you all metric names currently known to Prometheus containing mtv, xcopy, or migration.
 
+
+
+
+
+etcd_disk_wal_fsync_duration_seconds_bucket: Measures write-ahead log disk sync latency to detect slow storage bottlenecks 
+etcd_server_has_leader: Indicates whether the node sees an active leader to ensure quorum remains intact 
+etcd_server_leader_changes_seen_total: Tracks leadership election frequency to detect cluster instability and network or disk thrashing
+etcd_server_proposals_failed_total: Counts rejected write proposals to signal quorum loss or network partition issues 
+etcd_mvcc_db_total_size_in_bytes: Monitors physical database storage footprint to avoid reaching backend quota limits 
+
 From that output, we can identify exactly which metrics your MTV installation exposes and then build the correct PromQL for ETA, stuck migration, throughput, failure, phase, and VM-size correlation rather than relying on potentially incorrect metric names.
