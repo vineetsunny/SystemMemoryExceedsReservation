@@ -1,5 +1,12 @@
 ```mermaid
+
 flowchart TD
+    A["Start: MCP rollout stuck"] --> B["Check MCP, nodes and Machine Config Operator"]
+    B --> C{"MCP rollout complete?"}
+
+    C -->|Yes| D["Verify node health and close analysis"]
+    C -->|No| E["Identify affected node"]
+    E --> F["Check node conditions, events and MCD logs"]
     F --> G{"Classify the issue"}
 
     G -->|PDB / Drain| H["Check PDB and eviction events"]
@@ -25,8 +32,18 @@ flowchart TD
     K --> X["Inspect degraded reason,<br/>MCD logs and node annotations"]
     L --> Y["Capture events, logs and<br/>rollout timeline"]
 
+    O --> Z["Recheck node and MCP"]
+    P --> Z
+    S --> Z
+    T --> Z
+    V --> Z
+    W --> Z
+    X --> Z
+    Y --> Z
 
     Z --> AA{"Node updated and Ready?"}
     AA -->|Yes| AB["Verify MCP Updated=True<br/>Updating=False"]
     AA -->|No| AC["Escalate with collected evidence"]
+
+
 ```
