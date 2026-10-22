@@ -25,14 +25,6 @@ flowchart TD
     K --> X["Inspect degraded reason,<br/>MCD logs and node annotations"]
     L --> Y["Capture events, logs and<br/>rollout timeline"]
 
-    O --> Z["Recheck node and MCP"]
-    P --> Z
-    S --> Z
-    T --> Z
-    V --> Z
-    W --> Z
-    X --> Z
-    Y --> Z
 
     Z --> AA{"Node updated and Ready?"}
     AA -->|Yes| AB["Verify MCP Updated=True<br/>Updating=False"]
