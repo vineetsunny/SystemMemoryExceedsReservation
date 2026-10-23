@@ -82,7 +82,20 @@ count(
     {job="etcd-metrics"}
   )
 )
+============OTEL metric============
 
+oc get opentelemetrycollector "$COLLECTOR" -n "$NS" -o json |
+jq -r '
+  .spec.config.receivers.prometheus.config.scrape_configs[] |
+  [
+    .job_name,
+    (.scrape_interval // "default (not specified)"),
+    (.params["match[]"] // [] | length)
+  ] | @tsv
+' |
+awk 'BEGIN {
+  print "JOB\tSCRAPE_INTERVAL\tMETRIC_SELECTOR_COUNT"
+} {print}'
 
 
 
