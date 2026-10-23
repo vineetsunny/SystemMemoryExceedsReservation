@@ -83,6 +83,7 @@ count(
   )
 )
 ============OTEL metric============
+***1. Count/frequency/Job names***
 
 oc get opentelemetrycollector "$COLLECTOR" -n "$NS" -o json |
 jq -r '
@@ -96,6 +97,37 @@ jq -r '
 awk 'BEGIN {
   print "JOB\tSCRAPE_INTERVAL\tMETRIC_SELECTOR_COUNT"
 } {print}'
+
+
+***2. Display metric selectors for a specific job***
+
+oc get opentelemetrycollector <collector-name> -n <namespace> -o json |
+jq -r '
+  .spec.config.receivers.prometheus.config.scrape_configs[] |
+  select(.job_name == "etcd-metrics") |
+  "Job: \(.job_name)\nScrape interval: \(.scrape_interval // "default")\nMetric selectors:" ,
+  (.params["match[]"][]?)
+'
+***3. Display metric selectors for all jobs***
+
+oc get opentelemetrycollector <collector-name> -n <namespace> -o json |
+jq -r '
+  .spec.config.receivers.prometheus.config.scrape_configs[] |
+  "Job: \(.job_name) | Interval: \(.scrape_interval // "default")",
+  (.params["match[]"][]? // "No match[] selectors configured"),
+  ""
+'
+
+***4. Filter only jobs containing a particular metric selector***
+
+oc get opentelemetrycollector <collector-name> -n <namespace> -o json |
+jq -r '
+  .spec.config.receivers.prometheus.config.scrape_configs[] |
+  select(any(.params["match[]"][]?; contains("apiserver_request_total"))) |
+  .job_name
+'
+
+
 
 
 
