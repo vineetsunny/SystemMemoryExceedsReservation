@@ -1,0 +1,9 @@
+virtctl image-upload pvc win2k19-iso-pvc \
+  --size=10Gi \
+  --image-path=/path/to/mounted/iso/windows_server_2019.iso \
+  --storage-class=<your-storage-class> \
+  --access-mode=ReadWriteOnce \
+  --namespace=<your-target-project> \
+  --insecure
+
+
