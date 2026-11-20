@@ -1,7 +1,7 @@
 
 1. Dump the libvirt domain XML
 
-oc exec -n <namespace> <virt-launcher-pod-name> -c compute -- virsh dumpxml <namespace>_<vm-name> | xmllint --xpath '//devices/disk' -
+oc exec -n namespace virt-launcher-pod-name -c compute -- virsh dumpxml namespace_vm-name | xmllint --xpath '//devices/disk' -
 
 ```bash
     <disk type='block' device='disk' model='virtio-non-transitional'>
@@ -32,7 +32,7 @@ oc exec -n <namespace> <virt-launcher-pod-name> -c compute -- virsh dumpxml <nam
 
 2. Get the minor and major number from the disks
 
-oc exec -n <namespace> <virt-launcher-pod> -c compute -- stat -c "%n -> Major:Minor = %t:%T (hex)" <disk-path-1> <disk-path-2>
+oc exec -n namespace virt-launcher-pod -c compute -- stat -c "%n -> Major:Minor = %t:%T (hex)" disk-path-1 disk-path-2
 
 ```bash
 oc exec -n default virt-launcher-linux-test-grktk -c compute -- stat -c "%n -> Major:Minor = %t:%T (hex) | %Hr:%Lr (dec)" /dev/rootdisk /var/run/kubevirt/hotplug-disks/opt-disk
