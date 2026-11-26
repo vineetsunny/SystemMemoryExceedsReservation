@@ -45,16 +45,16 @@ oc -n $NAMESPACE logs --tail=-1 -l control-plane=ssp-operator | grep 'common tem
 
 ### Mitigation
 
-1. Avoid modifying common templates managed by the SSP Operator.
+1. Avoid modifying common templates managed by the SSP Operator.<br/>
 Changes are reverted during reconciliation.
 
 2. Resolve conflicting automation
-Identify the automation modifying the managed templates.
-Remove conflicting changes from its source configuration.
-Update automation to exclude SSP-managed templates.
-Prevent automation from reapplying the changes.
+- Identify the automation modifying the managed templates.
+- Remove conflicting changes from its source configuration.
+- Update automation to exclude SSP-managed templates.
+- Prevent automation from reapplying the changes.
 
 3. Use custom template copies
-Create a copy of the common template for customization.
-Apply changes to the copied template.
-Use a unique name to avoid conflicts with SSP-managed templates.
+- Create a copy of the common template for customization.
+- Apply changes to the copied template.
+- Use a unique name to avoid conflicts with SSP-managed templates.
